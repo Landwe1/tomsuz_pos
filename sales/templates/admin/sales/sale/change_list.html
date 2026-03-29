@@ -1,0 +1,10 @@
+{% extends "admin/change_list.html" %}
+{% block content_title %}
+    {{ block.super }}
+    <div style="background: #28a745; color: white; padding: 15px; border-radius: 8px; margin: 10px 0 20px 0; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <h3 style="margin: 0; font-family: sans-serif;">
+            <span style="font-weight: normal; font-size: 0.8em;">Today's Total Revenue:</span><br>
+            K{{ today_total|floatformat:2 }}
+        </h3>
+    </div>
+{% endblock %}

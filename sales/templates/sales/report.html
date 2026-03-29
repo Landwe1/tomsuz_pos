@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TomSuz Business Insights</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .metric-card { border-radius: 15px; border: none; transition: 0.3s; }
+        .metric-card:hover { transform: translateY(-5px); }
+        .bg-gradient-blue { background: linear-gradient(45deg, #0056b3, #00b4db); color: white; }
+    </style>
+</head>
+<body class="bg-light">
+
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold">Business Performance</h2>
+        <a href="{% url 'main_dashboard' %}" class="btn btn-outline-primary">Back to Dashboard</a>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="card metric-card bg-gradient-blue shadow-sm p-3">
+                <small>Today</small>
+                <h3 class="mb-0">K{{ today_total|floatformat:2 }}</h3>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card metric-card bg-white shadow-sm p-3">
+                <small class="text-muted">This Week</small>
+                <h3 class="mb-0 text-primary">K{{ week_total|floatformat:2 }}</h3>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card metric-card bg-white shadow-sm p-3">
+                <small class="text-muted">This Month</small>
+                <h3 class="mb-0 text-primary">K{{ month_total|floatformat:2 }}</h3>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card metric-card bg-dark text-white shadow-sm p-3">
+                <small>This Year</small>
+                <h3 class="mb-0 text-info">K{{ year_total|floatformat:2 }}</h3>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm p-3">
+                <h5 class="card-title mb-3">5-Year Growth Trend</h5>
+                <canvas id="growthChart" height="150"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-body">
+            <h5 class="mb-3">Yearly History</h5>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Year</th>
+                            <th class="text-end">Revenue</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in yearly_breakdown %}
+                        <tr>
+                            <td>{{ item.year }}</td>
+                            <td class="text-end fw-bold">K{{ item.total|floatformat:2 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const ctx = document.getElementById('growthChart').getContext('2d');
+    
+    // Reverse data for the chart so it goes from oldest to newest year
+    const yearlyData = {{ yearly_breakdown|safe }}.reverse();
+    const labels = yearlyData.map(item => item.year);
+    const values = yearlyData.map(item => item.total);
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Annual Revenue (K)',
+                data: values,
+                borderColor: '#0056b3',
+                backgroundColor: 'rgba(0, 86, 179, 0.1)',
+                fill: true,
+                tension: 0.4,
+                borderWidth: 3,
+                pointRadius: 5,
+                pointBackgroundColor: '#0056b3'
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: '#f0f0f0' }
+                },
+                x: {
+                    grid: { display: false }
+                }
+            }
+        }
+    });
+</script>
+
+</body>
+</html>
+
+

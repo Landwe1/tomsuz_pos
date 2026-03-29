@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TomSuz POS - Checkout</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        .cart-container { position: sticky; top: 0; z-index: 1000; background: white; border-bottom: 2px solid #0056b3; }
+        .product-grid { max-height: 60vh; overflow-y: auto; }
+        .product-btn { text-align: left; height: 100%; border-left: 4px solid #0056b3; transition: 0.2s; }
+        .product-btn:active { transform: scale(0.95); }
+        #cart-items { min-height: 1.5em; }
+    </style>
+</head>
+<body class="bg-light">
+
+<div class="cart-container p-3 shadow-sm">
+    <div class="d-flex justify-content-between align-items-center">
+        <h4>Total: <span class="text-primary">K<span id="display-total">0.00</span></span></h4>
+        <button class="btn btn-success px-4 fw-bold" data-bs-toggle="modal" data-bs-target="#checkoutModal" id="checkout-btn" disabled>Checkout</button>
+    </div>
+    <div id="cart-items" class="small text-muted mt-2 text-truncate">Cart is empty</div>
+</div>
+
+<div class="container py-3">
+    <input type="text" id="barcode-input" class="form-control mb-3" placeholder="Scan Barcode or Search..." autofocus>
+    
+    <div class="row g-2 product-grid">
+        {% for product in products %}
+        <div class="col-6 col-md-4">
+            <button class="btn btn-white w-100 product-btn shadow-sm bg-white" 
+                    onclick="addToCart('{{ product.id }}', '{{ product.name }}', '{{ product.selling_price }}')">
+                <div class="fw-bold">{{ product.name }}</div>
+                <div class="text-muted small">K{{ product.selling_price }}</div>
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="modal fade" id="checkoutModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-0"><h5 class="modal-title">Complete Sale</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <h3 class="text-center mb-4">Total: K<span id="modal-total">0.00</span></h3>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Amount Received (K)</label>
+                    <input type="number" id="amount-paid" class="form-control form-control-lg" placeholder="Enter cash amount">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Payment Method</label>
+                    <select id="pay-method" class="form-select form-select-lg">
+                        <option value="CASH">Cash</option>
+                        <option value="MOMO">Mobile Money (MTN/Airtel)</option>
+                        <option value="CREDIT">Store Credit / Debt</option>
+                    </select>
+                </div>
+                <div class="alert alert-warning text-center">
+                    <h4 class="mb-0">Change: K<span id="change-due">0.00</span></h4>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button class="btn btn-primary w-100 py-3 fw-bold" onclick="submitSale()">FINISH SALE</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="successModal" data-bs-backdrop="static" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content text-center p-4">
+            <div class="text-success mb-3"><i class="bi bi-check-circle-fill" style="font-size: 3rem;"></i></div>
+            <h4>Sale Complete!</h4>
+            <p class="text-muted">How would the customer like their receipt?</p>
+            
+            <div class="d-grid gap-2">
+                <button class="btn btn-outline-success py-2" onclick="shareWhatsApp()">
+                    <i class="bi bi-whatsapp me-2"></i> Send via WhatsApp
+                </button>
+                <button class="btn btn-outline-dark py-2" onclick="printReceipt()">
+                    <i class="bi bi-printer me-2"></i> Print Receipt
+                </button>
+                <hr>
+                <button class="btn btn-primary" onclick="location.reload()">New Sale</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let cart = [];
+let total = 0;
+let lastSaleData = null; // Store data for sharing after success
+
+function addToCart(id, name, price) {
+    price = parseFloat(price);
+    const existing = cart.find(item => item.id === id);
+    if (existing) {
+        existing.quantity += 1;
+    } else {
+        cart.push({ id, name, price, quantity: 1 });
+    }
+    updateUI();
+}
+
+function updateUI() {
+    const cartDiv = document.getElementById('cart-items');
+    total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    cartDiv.innerHTML = cart.map(item => `${item.quantity}x ${item.name}`).join(', ') || "Cart is empty";
+    document.getElementById('display-total').innerText = total.toFixed(2);
+    document.getElementById('modal-total').innerText = total.toFixed(2);
+    document.getElementById('checkout-btn').disabled = cart.length === 0;
+}
+
+document.getElementById('amount-paid').addEventListener('input', (e) => {
+    const paid = parseFloat(e.target.value) || 0;
+    document.getElementById('change-due').innerText = Math.max(0, paid - total).toFixed(2);
+});
+
+async function submitSale() {
+    const saleInfo = {
+        cart: cart,
+        total_amount: total,
+        amount_paid: document.getElementById('amount-paid').value || 0,
+        change_due: document.getElementById('change-due').innerText,
+        payment_method: document.getElementById('pay-method').value
+    };
+
+    const response = await fetch('', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+        body: JSON.stringify(saleInfo)
+    });
+
+    if (response.ok) {
+        lastSaleData = saleInfo; // Save for the WhatsApp share function
+        const checkoutModal = bootstrap.Modal.getInstance(document.getElementById('checkoutModal'));
+        checkoutModal.hide();
+        new bootstrap.Modal(document.getElementById('successModal')).show();
+    } else {
+        alert("Error saving sale. Check connection.");
+    }
+}
+
+function shareWhatsApp() {
+    if(!lastSaleData) return;
+    let message = `*TomSuz POS Receipt*\n--------------------------\n`;
+    lastSaleData.cart.forEach(item => {
+        message += `${item.name} x ${item.quantity}: K${(item.price * item.quantity).toFixed(2)}\n`;
+    });
+    message += `--------------------------\n*Total: K${lastSaleData.total_amount}*\nPayment: ${lastSaleData.payment_method}\n\nThank you for your business!`;
+    
+    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+}
+
+function printReceipt() {
+    // This triggers a simple browser print of a simulated receipt
+    const printWin = window.open('', '', 'width=300,height=600');
+    printWin.document.write('<html><body style="font-family:monospace;width:200px;text-align:center;">');
+    printWin.document.write('<h3>TomSuz Store</h3><hr>');
+    lastSaleData.cart.forEach(item => {
+        printWin.document.write(`<div style="display:flex;justify-content:space-between"><span>${item.name} x${item.quantity}</span><span>K${(item.price * item.quantity).toFixed(2)}</span></div>`);
+    });
+    printWin.document.write(`<hr><b>Total: K${lastSaleData.total_amount}</b><br>`);
+    printWin.document.write('Thank you!</body></html>');
+    printWin.document.close();
+    printWin.print();
+}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
