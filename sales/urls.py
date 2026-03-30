@@ -1,6 +1,8 @@
 from django.urls import path
 from . import views
 
+app_name = 'sales'  # This is important for namespacing your URLs
+
 urlpatterns = [
     # The POS terminal for making sales
     path('pos/', views.pos_screen, name='pos_screen'),
