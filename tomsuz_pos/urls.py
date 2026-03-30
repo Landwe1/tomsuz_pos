@@ -16,13 +16,16 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from django.shortcuts import redirect # Add this import
+from django.shortcuts import redirect
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    
+    # 1. Add your app URLs here
     path('products/', include('products.urls')),
     path('sales/', include('sales.urls')),
+    path('accounts/', include('accounts.urls')), # <--- ADD THIS LINE
     
-    # This tells Django: "If the path is empty, send them to the sales dashboard"
-    path('', lambda request: redirect('main_dashboard', permanent=False)),
+    # 2. This handles the "Empty" home page (redirects to the dashboard)
+    path('', lambda request: redirect('sales:main_dashboard', permanent=False)),
 ]
