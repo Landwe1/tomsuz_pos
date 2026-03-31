@@ -16,16 +16,14 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from django.shortcuts import redirect
+from . import views # You'll need to create a view for the landing page
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    
-    # 1. Add your app URLs here
     path('products/', include('products.urls')),
     path('sales/', include('sales.urls')),
-    path('accounts/', include('accounts.urls')), # <--- ADD THIS LINE
+    path('accounts/', include('accounts.urls')),
     
-    # 2. This handles the "Empty" home page (redirects to the dashboard)
-    path('', lambda request: redirect('sales:main_dashboard', permanent=False)),
+    # This is the "Front Door" where users see your TomSuz branding
+    path('', views.landing_page, name='landing'), 
 ]
