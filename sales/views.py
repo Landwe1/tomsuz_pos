@@ -130,7 +130,7 @@ def add_cashier(request):
     owner_profile = request.user.profile
     
     if not owner_profile.is_owner:
-        return redirect('pos_screen')
+        return redirect('sales:pos_screen')
 
     if request.method == 'POST':
         username = request.POST.get('username')
