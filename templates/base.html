@@ -16,7 +16,7 @@
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm mb-4">
         <div class="container">
-            <a class="navbar-brand text-primary" href="{% url 'main_dashboard' %}">
+            <a class="navbar-brand text-primary" href="{% url 'sales:main_dashboard' %}">
                 TOMSUZ <span class="text-white">POS</span>
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -25,10 +25,10 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'main_dashboard' %}">Dashboard</a>
+                        <a class="nav-link" href="{% url 'sales:main_dashboard' %}">Dashboard</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'pos_screen' %}">POS Terminal</a>
+                        <a class="nav-link" href="{% url 'sales:pos_screen' %}">POS Terminal</a>
                     </li>
                     <li class="nav-item">
                         <span class="nav-link text-info small">User: {{ request.user.username }}</span>
