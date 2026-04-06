@@ -11,7 +11,7 @@ urlpatterns = [
     path('dashboard/', views.main_dashboard, name='main_dashboard'),
     
     # Detailed reports (Redirected to dashboard for now)
-    path('report/', views.sales_report, name='sales_report'),
+    path('report/', views.main_dashboard, name='sales_report'),
     
     # The tool to add new cashiers
     path('add-cashier/', views.add_cashier, name='add_cashier'),
