@@ -137,7 +137,7 @@ def delete_sale(request, sale_id):
 
     sale.delete()
     messages.success(request, f"Sale #{sale_id} deleted and stock returned.")
-    return redirect('sales_history')
+    return redirect('sales:sales_history')
 
 @login_required
 def sales_history(request):

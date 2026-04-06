@@ -34,6 +34,7 @@
                     onclick="addToCart('{{ product.id }}', '{{ product.name }}', '{{ product.selling_price }}')">
                 <div class="fw-bold">{{ product.name }}</div>
                 <div class="text-muted small">K{{ product.selling_price }}</div>
+                <div class="text-muted smaller">Stock: {{ product.stock_quantity }}</div>
             </button>
         </div>
         {% endfor %}
@@ -93,7 +94,7 @@
 <script>
 let cart = [];
 let total = 0;
-let lastSaleData = null; // Store data for sharing after success
+let lastSaleData = null;
 
 function addToCart(id, name, price) {
     price = parseFloat(price);
@@ -129,19 +130,27 @@ async function submitSale() {
         payment_method: document.getElementById('pay-method').value
     };
 
-    const response = await fetch('', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-        body: JSON.stringify(saleInfo)
-    });
+    try {
+        const response = await fetch('{% url "sales:pos_screen" %}', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json', 
+                'X-CSRFToken': '{{ csrf_token }}' 
+            },
+            body: JSON.stringify(saleInfo)
+        });
 
-    if (response.ok) {
-        lastSaleData = saleInfo; // Save for the WhatsApp share function
-        const checkoutModal = bootstrap.Modal.getInstance(document.getElementById('checkoutModal'));
-        checkoutModal.hide();
-        new bootstrap.Modal(document.getElementById('successModal')).show();
-    } else {
-        alert("Error saving sale. Check connection.");
+        if (response.ok) {
+            lastSaleData = saleInfo;
+            const checkoutModal = bootstrap.Modal.getInstance(document.getElementById('checkoutModal'));
+            checkoutModal.hide();
+            new bootstrap.Modal(document.getElementById('successModal')).show();
+        } else {
+            const error = await response.json();
+            alert("Error: " + (error.message || "Failed to save sale."));
+        }
+    } catch (err) {
+        alert("Network error. Please check your internet connection.");
     }
 }
 
@@ -151,21 +160,19 @@ function shareWhatsApp() {
     lastSaleData.cart.forEach(item => {
         message += `${item.name} x ${item.quantity}: K${(item.price * item.quantity).toFixed(2)}\n`;
     });
-    message += `--------------------------\n*Total: K${lastSaleData.total_amount}*\nPayment: ${lastSaleData.payment_method}\n\nThank you for your business!`;
-    
+    message += `--------------------------\n*Total: K${lastSaleData.total_amount.toFixed(2)}*\nPayment: ${lastSaleData.payment_method}\n\nThank you for your business!`;
     const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
 }
 
 function printReceipt() {
-    // This triggers a simple browser print of a simulated receipt
     const printWin = window.open('', '', 'width=300,height=600');
     printWin.document.write('<html><body style="font-family:monospace;width:200px;text-align:center;">');
     printWin.document.write('<h3>TomSuz Store</h3><hr>');
     lastSaleData.cart.forEach(item => {
         printWin.document.write(`<div style="display:flex;justify-content:space-between"><span>${item.name} x${item.quantity}</span><span>K${(item.price * item.quantity).toFixed(2)}</span></div>`);
     });
-    printWin.document.write(`<hr><b>Total: K${lastSaleData.total_amount}</b><br>`);
+    printWin.document.write(`<hr><b>Total: K${lastSaleData.total_amount.toFixed(2)}</b><br>`);
     printWin.document.write('Thank you!</body></html>');
     printWin.document.close();
     printWin.print();
@@ -175,4 +182,5 @@ function printReceipt() {
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
+
 
