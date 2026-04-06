@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold">Manage Inventory</h3>
+        <a href="{% url 'sales:main_dashboard' %}" class="btn btn-outline-secondary btn-sm">Back</a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-success">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="card shadow-sm border-0">
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Product Name</th>
+                        <th style="width: 150px;">Stock Qty</th>
+                        <th style="width: 150px;">Price (K)</th>
+                        <th class="text-end">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for product in products %}
+                    <tr>
+                        <form method="POST">
+                            {% csrf_token %}
+                            <input type="hidden" name="product_id" value="{{ product.id }}">
+                            <td><span class="fw-bold">{{ product.name }}</span></td>
+                            <td>
+                                <input type="number" name="stock" class="form-control form-control-sm" value="{{ product.stock_quantity }}">
+                            </td>
+                            <td>
+                                <input type="number" step="0.01" name="price" class="form-control form-control-sm" value="{{ product.selling_price }}">
+                            </td>
+                            <td class="text-end">
+                                <button type="submit" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-save me-1"></i> Save
+                                </button>
+                            </td>
+                        </form>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

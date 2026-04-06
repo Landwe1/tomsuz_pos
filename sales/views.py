@@ -8,6 +8,9 @@ from django.contrib import messages
 from datetime import timedelta
 from products.models import Product
 from .models import Sale, SaleItem, Profile, Store
+from decimal import Decimal
+from django.contrib.auth.models import User
+from django.shortcuts import get_object_status_or_404
 import json
 
 @login_required
@@ -55,7 +58,7 @@ def pos_screen(request):
                 )
 
                 # 2. DEDUCT FROM INVENTORY
-                product.stock_quantity -= float(item['quantity'])
+                product.stock_quantity -= Decimal(str(item['quantity']))
                 product.save()
                 
             return JsonResponse({'status': 'success', 'sale_id': new_sale.id})
@@ -184,3 +187,57 @@ def add_cashier(request):
             return render(request, 'sales/add_cashier.html', {'error': 'Username exists or invalid data.'})
     return render(request, 'sales/add_cashier.html')
 
+
+@login_required
+def manage_inventory(request):
+    profile = request.user.profile
+    if not profile.is_owner:
+        return redirect('sales:pos_screen')
+
+    if request.method == 'POST':
+        product_id = request.POST.get('product_id')
+        new_stock = request.POST.get('stock')
+        new_price = request.POST.get('price')
+        
+        product = Product.objects.get(id=product_id, store=profile.store)
+        product.stock_quantity = Decimal(str(new_stock))
+        product.selling_price = Decimal(str(new_price))
+        product.save()
+        
+        messages.success(request, f"Updated {product.name} successfully!")
+        return redirect('sales:manage_inventory')
+
+    products = Product.objects.filter(store=profile.store).order_status('name')
+    return render(request, 'sales/manage_inventory.html', {'products': products})
+
+
+
+@login_required
+def toggle_cashier_status(request, user_id):
+    # Only the Owner can do this
+    if not request.user.profile.role == 'OWNER':
+        return redirect('sales:pos_screen')
+
+    # Get the cashier, ensuring they belong to the same store
+    cashier = get_object_or_404(User, id=user_id, profile__store=request.user.profile.store)
+    
+    # Prevent the owner from suspending themselves!
+    if cashier == request.user:
+        messages.error(request, "You cannot suspend your own account!")
+    else:
+        # Toggle the status
+        cashier.is_active = not cashier.is_active
+        cashier.save()
+        status = "Activated" if cashier.is_active else "Suspended"
+        messages.success(request, f"Account for {cashier.username} has been {status}.")
+
+    return redirect('sales:manage_staff') # We will create this page next
+
+@login_required
+def manage_staff(request):
+    if not request.user.profile.role == 'OWNER':
+        return redirect('sales:pos_screen')
+    
+    # Get all users in this store except the owner
+    staff = User.objects.filter(profile__store=request.user.profile.store).exclude(id=request.user.id)
+    return render(request, 'sales/manage_staff.html', {'staff': staff})

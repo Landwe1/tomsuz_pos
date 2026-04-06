@@ -19,4 +19,7 @@ urlpatterns = [
     path('transactions/history/', views.sales_history, name='sales_history'),
     path('history/', views.sales_history, name='sales_history'),
     path('delete-sale/<int:sale_id>/', views.delete_sale, name='delete_sale'),
+    path('manage-inventory/', views.manage_inventory, name='manage_inventory'),
+    path('staff/', views.staff_management, name='staff_management'),
+    path('staff/toggle/<int:user_id>/', views.toggle_staff_status, name='toggle_staff_status'),
 ]
