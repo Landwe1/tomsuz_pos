@@ -1,17 +1,18 @@
-from django.shortcuts import render, redirect, get_object_or_404
+import json
+from decimal import Decimal
+from datetime import timedelta
+from django.shortcuts import render, redirect, get_object_or_404  # Fixed typo here
 from django.http import JsonResponse
 from django.db.models import Sum
 from django.utils import timezone
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.contrib import messages
-from datetime import timedelta
+
+# Models
 from products.models import Product
 from .models import Sale, SaleItem, Profile, Store
-from decimal import Decimal
-from django.contrib.auth.models import User
-from django.shortcuts import get_object_status_or_404
-import json
+
 
 @login_required
 def pos_screen(request):
