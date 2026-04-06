@@ -18,4 +18,5 @@ urlpatterns = [
     
     path('transactions/history/', views.sales_history, name='sales_history'),
     path('history/', views.sales_history, name='sales_history'),
+    path('delete-sale/<int:sale_id>/', views.delete_sale, name='delete_sale'),
 ]
