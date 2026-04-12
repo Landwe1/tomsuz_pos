@@ -222,23 +222,36 @@ def delete_sale(request, sale_id):
 @login_required
 def add_product(request):
     profile = request.user.profile
-    if not profile.is_owner:
-        return JsonResponse({'status': 'error', 'message': 'Unauthorized'}, status=403)
+    
+    # Check if the user is an OWNER using your profile logic
+    if profile.role != 'OWNER':
+        messages.error(request, "Unauthorized: Only owners can add products.")
+        return redirect('sales:manage_inventory')
 
     if request.method == 'POST':
-        name = request.POST.get('name')
-        price = request.POST.get('price')
-        stock = request.POST.get('stock')
+        try:
+            name = request.POST.get('name')
+            price = request.POST.get('price')
+            stock = request.POST.get('stock')
 
-        # Create the product and link it to the owner's store
-        Product.objects.create(
-            store=profile.store,
-            name=name,
-            selling_price=Decimal(price),
-            stock_quantity=Decimal(stock)
-        )
-        messages.success(request, f"Product '{name}' added successfully!")
-        return redirect('sales:manage_inventory')
+            # Basic validation to prevent Decimal errors
+            if not name or not price or not stock:
+                messages.error(request, "All fields are required.")
+                return redirect('sales:manage_inventory')
+
+            # Create the product and link it to the owner's store
+            Product.objects.create(
+                store=profile.store,
+                name=name,
+                selling_price=Decimal(str(price)),
+                stock_quantity=Decimal(str(stock))
+            )
+            messages.success(request, f"Product '{name}' added successfully!")
+            
+        except Exception as e:
+            # This captures the error and displays it on the page instead of a 500 error
+            messages.error(request, f"System Error: {str(e)}")
+            return redirect('sales:manage_inventory')
 
     return redirect('sales:manage_inventory')
 
