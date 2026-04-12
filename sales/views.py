@@ -4,6 +4,7 @@ from datetime import timedelta
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from django.db.models import Sum
+from django.db import transaction
 from django.utils import timezone
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
@@ -36,30 +37,28 @@ def pos_screen(request):
         try:
             data = json.loads(request.body)
             
-            # Create the Sale record
-            new_sale = Sale.objects.create(
-                cashier=request.user,
-                store=user_store, 
-                total_amount=Decimal(str(data['total_amount'])),
-                amount_paid=Decimal(str(data['amount_paid'])),
-                change_due=Decimal(str(data['change_due'])),
-                payment_method=data['payment_method']
-            )
-
-            for item in data['cart']:
-                product = Product.objects.get(id=item['id'], store=user_store)
-                
-                # 1. Create the Sale Item
-                SaleItem.objects.create(
-                    sale=new_sale,
-                    product=product,
-                    quantity=item['quantity'],
-                    unit_price=Decimal(str(item['price']))
+            # Use a transaction to ensure both Sale and SaleItems are saved correctly
+            with transaction.atomic():
+                # Create the Sale record
+                new_sale = Sale.objects.create(
+                    cashier=request.user,
+                    store=user_store, 
+                    total_amount=Decimal(str(data['total_amount'])),
+                    amount_paid=Decimal(str(data['amount_paid'])),
+                    change_due=Decimal(str(data['change_due'])),
+                    payment_method=data['payment_method']
                 )
 
-                # 2. DEDUCT FROM INVENTORY
-                product.stock_quantity -= Decimal(str(item['quantity']))
-                product.save()
+                for item in data['cart']:
+                    product = Product.objects.get(id=item['id'], store=user_store)
+                    
+                    # Create the Sale Item (Model logic handles stock deduction)
+                    SaleItem.objects.create(
+                        sale=new_sale,
+                        product=product,
+                        quantity=item['quantity'],
+                        unit_price=Decimal(str(item['price']))
+                    )
                 
             return JsonResponse({'status': 'success', 'sale_id': new_sale.id})
         except Product.DoesNotExist:
@@ -125,18 +124,25 @@ def manage_inventory(request):
         messages.success(request, f"Updated {product.name} successfully!")
         return redirect('sales:manage_inventory')
 
-    # FIXED: Changed 'order_status' to 'order_by'
     products = Product.objects.filter(store=profile.store).order_by('name')
     return render(request, 'sales/manage_inventory.html', {'products': products})
 
 @login_required
 def manage_staff(request):
-    # FIXED: Use consistent role check
     if request.user.profile.role != 'OWNER':
         return redirect('sales:pos_screen')
     
     staff = User.objects.filter(profile__store=request.user.profile.store).exclude(id=request.user.id)
     return render(request, 'sales/manage_staff.html', {'staff': staff})
+
+@login_required
+def add_cashier(request):
+    """Tool for owners to register new cashier accounts."""
+    if request.user.profile.role != 'OWNER':
+        return redirect('sales:pos_screen')
+    
+    # Logic for creating new cashier goes here
+    return render(request, 'sales/add_cashier.html')
 
 @login_required
 def toggle_cashier_status(request, user_id):
@@ -180,4 +186,30 @@ def sales_history(request):
         'end_date': end_date,
         'store': user_store
     })
+
+@login_required
+def delete_sale(request, sale_id):
+    """Deletes a sale and returns all items to the inventory stock."""
+    profile = request.user.profile
+    if not profile.is_owner:
+        messages.error(request, "Access denied. Only owners can delete sales.")
+        return redirect('sales:pos_screen')
+
+    sale = get_object_or_404(Sale, id=sale_id, store=profile.store)
+
+    try:
+        with transaction.atomic():
+            # Return items to stock before deleting the sale record
+            for item in sale.items.all():
+                product = item.product
+                product.stock_quantity += item.quantity
+                product.save()
+
+            sale.delete()
+            messages.success(request, f"Sale #{sale_id} deleted and inventory restored.")
+    except Exception as e:
+        messages.error(request, f"Error deleting sale: {str(e)}")
+
+    return redirect('sales:sales_history')
+
 
