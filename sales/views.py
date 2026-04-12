@@ -219,4 +219,28 @@ def delete_sale(request, sale_id):
 
     return redirect('sales:sales_history')
 
+@login_required
+def add_product(request):
+    profile = request.user.profile
+    if not profile.is_owner:
+        return JsonResponse({'status': 'error', 'message': 'Unauthorized'}, status=403)
+
+    if request.method == 'POST':
+        name = request.POST.get('name')
+        price = request.POST.get('price')
+        stock = request.POST.get('stock')
+
+        # Create the product and link it to the owner's store
+        Product.objects.create(
+            store=profile.store,
+            name=name,
+            selling_price=Decimal(price),
+            stock_quantity=Decimal(stock)
+        )
+        messages.success(request, f"Product '{name}' added successfully!")
+        return redirect('sales:manage_inventory')
+
+    return redirect('sales:manage_inventory')
+
+
 

@@ -26,4 +26,5 @@ urlpatterns = [
     # Staff Management (Fixed these names to match your views.py)
     path('staff/', views.manage_staff, name='manage_staff'),
     path('staff/toggle/<int:user_id>/', views.toggle_cashier_status, name='toggle_cashier_status'),
+    path('add-product/', views.add_product, name='add_product'),
 ]
