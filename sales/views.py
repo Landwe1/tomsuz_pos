@@ -108,24 +108,31 @@ def main_dashboard(request):
 @login_required
 def manage_inventory(request):
     profile = request.user.profile
-    if profile.role != 'OWNER':
+    if not profile.is_owner:
         return redirect('sales:pos_screen')
 
     if request.method == 'POST':
         product_id = request.POST.get('product_id')
-        new_stock = request.POST.get('stock')
-        new_price = request.POST.get('price')
+        product = get_object_or_404(Product, id=product_id, store=profile.store)
         
-        product = Product.objects.get(id=product_id, store=profile.store)
-        product.stock_quantity = Decimal(str(new_stock))
-        product.selling_price = Decimal(str(new_price))
+        action = request.POST.get('action') # We'll send this from the button
+        
+        if action == "restock":
+            added_qty = Decimal(request.POST.get('added_stock', 0))
+            product.stock_quantity += added_qty
+            messages.success(request, f"Added {added_qty} units to {product.name}.")
+        
+        elif action == "edit":
+            product.stock_quantity = Decimal(request.POST.get('stock'))
+            product.selling_price = Decimal(request.POST.get('price'))
+            messages.success(request, f"Updated {product.name} details.")
+
         product.save()
-        
-        messages.success(request, f"Updated {product.name} successfully!")
         return redirect('sales:manage_inventory')
 
     products = Product.objects.filter(store=profile.store).order_by('name')
     return render(request, 'sales/manage_inventory.html', {'products': products})
+
 
 @login_required
 def manage_staff(request):

@@ -9,7 +9,10 @@
 
     {% if messages %}
         {% for message in messages %}
-            <div class="alert alert-success">{{ message }}</div>
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
         {% endfor %}
     {% endif %}
 
@@ -19,7 +22,8 @@
                 <thead class="table-light">
                     <tr>
                         <th>Product Name</th>
-                        <th style="width: 150px;">Stock Qty</th>
+                        <th style="width: 180px;">Quick Restock (Add)</th>
+                        <th style="width: 150px;">Total Stock</th>
                         <th style="width: 150px;">Price (K)</th>
                         <th class="text-end">Action</th>
                     </tr>
@@ -27,22 +31,43 @@
                 <tbody>
                     {% for product in products %}
                     <tr>
-                        <form method="POST">
+                        <form method="POST" action="{% url 'sales:manage_inventory' %}">
                             {% csrf_token %}
                             <input type="hidden" name="product_id" value="{{ product.id }}">
-                            <td><span class="fw-bold">{{ product.name }}</span></td>
+                            
+                            <td>
+                                <span class="fw-bold">{{ product.name }}</span>
+                                {% if product.stock_quantity <= 5 %}
+                                    <br><span class="badge bg-danger">Low Stock</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                <div class="input-group input-group-sm">
+                                    <input type="number" name="added_stock" class="form-control" placeholder="+ Qty">
+                                    <button type="submit" name="action" value="restock" class="btn btn-success">
+                                        Add
+                                    </button>
+                                </div>
+                            </td>
+
                             <td>
                                 <input type="number" name="stock" class="form-control form-control-sm" value="{{ product.stock_quantity }}">
                             </td>
                             <td>
                                 <input type="number" step="0.01" name="price" class="form-control form-control-sm" value="{{ product.selling_price }}">
                             </td>
+                            
                             <td class="text-end">
-                                <button type="submit" class="btn btn-primary btn-sm">
-                                    <i class="bi bi-save me-1"></i> Save
+                                <button type="submit" name="action" value="edit" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-pencil-square me-1"></i> Update
                                 </button>
                             </td>
                         </form>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-4 text-muted">No products found in your store.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
