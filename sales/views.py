@@ -71,23 +71,36 @@ def pos_screen(request):
 @login_required
 def main_dashboard(request):
     """The main Owner's Dashboard with financial data and inventory."""
-    profile = request.user.profile
+    
+    # 1. Safely get or create the profile to prevent Error 500
+    profile, created = Profile.objects.get_or_create(
+        user=request.user, 
+        defaults={'role': 'OWNER'} # Default new test accounts to OWNER
+    )
+
+    # 2. Check role (ensure it's not a cashier trying to see the owner dashboard)
     if profile.role != 'OWNER':
         return redirect('pos_screen')
 
     user_store = profile.store
 
+    # 3. Handle Store Creation if the new account doesn't have one yet
     if not user_store:
         if request.method == "POST":
             action = request.POST.get('action')
             if action == "create":
                 store_name = request.POST.get('store_name')
-                new_store = Store.objects.create(owner=request.user, name=store_name)
-                profile.store = new_store
-                profile.save()
-                return redirect('main_dashboard')
+                # Only create if name is provided
+                if store_name:
+                    new_store = Store.objects.create(owner=request.user, name=store_name)
+                    profile.store = new_store
+                    profile.save()
+                    return redirect('main_dashboard')
+        
+        # This renders the "Name your store" page for new accounts
         return render(request, 'sales/store_choice.html')
 
+    # 4. Data Calculations (Safe for new stores with 0 sales)
     now = timezone.now()
     today = now.date()
     store_sales = Sale.objects.filter(store=user_store)
@@ -136,26 +149,69 @@ def manage_inventory(request):
 
 @login_required
 def manage_staff(request):
-    if request.user.profile.role != 'OWNER':
-        return redirect('sales:pos_screen')
+    """Lists all staff members belonging to the owner's store."""
+    profile = request.user.profile
+    if profile.role != 'OWNER':
+        return redirect('pos_screen')
     
-    staff = User.objects.filter(profile__store=request.user.profile.store).exclude(id=request.user.id)
+    # Get all users who have a profile linked to this specific store
+    staff = User.objects.filter(
+        profile__store=profile.store
+    ).exclude(
+        id=request.user.id
+    ).select_related('profile')
+    
     return render(request, 'sales/manage_staff.html', {'staff': staff})
+
 
 @login_required
 def add_cashier(request):
-    """Tool for owners to register new cashier accounts."""
-    if request.user.profile.role != 'OWNER':
-        return redirect('sales:pos_screen')
+    """Tool for owners to register new cashier accounts linked to their store."""
+    profile = request.user.profile
+    if profile.role != 'OWNER':
+        return redirect('pos_screen')
     
-    # Logic for creating new cashier goes here
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        first_name = request.POST.get('first_name', '')
+        last_name = request.POST.get('last_name', '')
+
+        if User.objects.filter(username=username).exists():
+            messages.error(request, f"Username '{username}' is already taken.")
+        else:
+            try:
+                with transaction.atomic():
+                    # 1. Create the User
+                    new_user = User.objects.create_user(
+                        username=username, 
+                        password=password,
+                        first_name=first_name,
+                        last_name=last_name
+                    )
+                    
+                    # 2. Update or Create the Profile linked to the Owner's store
+                    # get_or_create handles cases where signals might have already made a blank profile
+                    user_profile, created = Profile.objects.get_or_create(user=new_user)
+                    user_profile.store = profile.store
+                    user_profile.role = 'CASHIER'
+                    user_profile.save()
+
+                messages.success(request, f"Cashier '{username}' added successfully!")
+                return redirect('manage_staff')
+            except Exception as e:
+                messages.error(request, f"Error adding cashier: {str(e)}")
+
     return render(request, 'sales/add_cashier.html')
+
 
 @login_required
 def toggle_cashier_status(request, user_id):
+    """Activates or Suspends a cashier's ability to log in."""
     if request.user.profile.role != 'OWNER':
-        return redirect('sales:pos_screen')
+        return redirect('pos_screen')
 
+    # Ensure the owner can only toggle users in THEIR store
     cashier = get_object_or_404(User, id=user_id, profile__store=request.user.profile.store)
     
     if cashier == request.user:
@@ -166,7 +222,7 @@ def toggle_cashier_status(request, user_id):
         status = "Activated" if cashier.is_active else "Suspended"
         messages.success(request, f"Account for {cashier.username} has been {status}.")
 
-    return redirect('sales:manage_staff')
+    return redirect('manage_staff')
 
 @login_required
 def sales_history(request):
