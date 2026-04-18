@@ -95,7 +95,7 @@
                                 <tbody>
                                     {% for staff in staff_members %}
                                     <tr>
-                                        <td class="fw-bold text-dark">{{ staff.user.username }}</td>
+                                        <td class="fw-bold text-dark">{{ staff.username }}</td>
                                         <td>
                                             {% if staff.role == 'OWNER' %}
                                                 <span class="badge rounded-pill bg-dark">Owner</span>
