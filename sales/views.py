@@ -122,7 +122,7 @@ def main_dashboard(request):
         'today_total': today_total,
         'month_total': month_total,
         'inventory': inventory,
-        'staff': staff,  # This is the missing piece!
+        'staff_members': staff,  # This is the missing piece!
     }
     return render(request, 'sales/dashboard.html', context)
 
