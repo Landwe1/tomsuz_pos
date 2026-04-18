@@ -3,13 +3,22 @@
 {% block content %}
 <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h3 class="fw-bold">Manage Staff</h3>
-        <a href="{% url 'sales:main_dashboard' %}" class="btn btn-outline-secondary btn-sm">Back</a>
+        <div>
+            <h3 class="fw-bold mb-0">Manage Staff</h3>
+            <p class="text-muted small">Manage access for your shop cashiers</p>
+        </div>
+        <div>
+            <a href="{% url 'sales:add_cashier' %}" class="btn btn-primary btn-sm me-2">+ Add Cashier</a>
+            <a href="{% url 'sales:main_dashboard' %}" class="btn btn-outline-secondary btn-sm">Back</a>
+        </div>
     </div>
 
     {% if messages %}
         {% for message in messages %}
-            <div class="alert alert-info">{{ message }}</div>
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
         {% endfor %}
     {% endif %}
 
@@ -20,7 +29,7 @@
                 <div class="card-body d-flex justify-content-between align-items-center">
                     <div>
                         <h5 class="mb-0 fw-bold">{{ member.username }}</h5>
-                        <small class="text-muted">Role: {{ member.profile.role }}</small>
+                        <small class="text-muted">Role: {{ member.profile.get_role_display }}</small>
                         <div class="mt-1">
                             {% if member.is_active %}
                                 <span class="badge bg-success">Active</span>
@@ -31,7 +40,7 @@
                     </div>
                     <div>
                         <a href="{% url 'sales:toggle_cashier_status' member.id %}" 
-                           class="btn {% if member.is_active %}btn-outline-danger{% else %}btn-success{% endif %} btn-sm">
+                           class="btn {% if member.is_active %}btn-outline-danger{% else %}btn-success{% endif %} btn-sm px-3">
                             {% if member.is_active %}Suspend{% else %}Activate{% endif %}
                         </a>
                     </div>
@@ -39,10 +48,15 @@
             </div>
         </div>
         {% empty %}
-        <div class="text-center py-5">
-            <p class="text-muted">No staff members found. Add one from the dashboard!</p>
+        <div class="col-12 text-center py-5">
+            <div class="mb-3">
+                <i class="bi bi-people text-muted" style="font-size: 3rem;"></i>
+            </div>
+            <p class="text-muted">No staff members found for your store.</p>
+            <a href="{% url 'sales:add_cashier' %}" class="btn btn-primary">Add your first cashier</a>
         </div>
         {% endfor %}
     </div>
 </div>
 {% endblock %}
+
