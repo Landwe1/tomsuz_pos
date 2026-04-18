@@ -17,27 +17,37 @@ from .models import Sale, SaleItem, Profile, Store
 @login_required
 def pos_screen(request):
     """Handles the mobile-first cashier interface and sale processing."""
+    
+    # 1. Safely get the profile and store
     try:
         profile = request.user.profile
         user_store = profile.store
     except Exception:
-        return render(request, 'sales/no_store_error.html', {'role': 'UNKNOWN'})
-
-    if not user_store:
-        if profile.role == 'OWNER':
-            return redirect('main_dashboard')
+        # Fallback if profile is missing entirely
         return render(request, 'sales/no_store_error.html', {
-            'role': profile.role,
-            'username': request.user.username
+            'role': 'CASHIER', 
+            'user': request.user
         })
 
+    # 2. Redirect Owners or show the Setup Required page for Cashiers
+    if not user_store:
+        if profile.role == 'OWNER':
+            return redirect('sales:main_dashboard')
+        
+        # This matches your dark-themed setup HTML variables
+        return render(request, 'sales/no_store_error.html', {
+            'role': profile.role,
+            'user': request.user  # So {{ user.username }} works
+        })
+
+    # 3. GET Method: Show the POS Terminal
     products = Product.objects.filter(store=user_store).order_by('name')
 
+    # 4. POST Method: Process the Sale
     if request.method == "POST":
         try:
             data = json.loads(request.body)
             
-            # Use a transaction to ensure both Sale and SaleItems are saved correctly
             with transaction.atomic():
                 # Create the Sale record
                 new_sale = Sale.objects.create(
@@ -52,7 +62,7 @@ def pos_screen(request):
                 for item in data['cart']:
                     product = Product.objects.get(id=item['id'], store=user_store)
                     
-                    # Create the Sale Item (Model logic handles stock deduction)
+                    # Create Sale Item (Model logic handles stock deduction)
                     SaleItem.objects.create(
                         sale=new_sale,
                         product=product,
@@ -61,13 +71,16 @@ def pos_screen(request):
                     )
                 
             return JsonResponse({'status': 'success', 'sale_id': new_sale.id})
+            
         except Product.DoesNotExist:
             return JsonResponse({'status': 'error', 'message': 'Product not found.'}, status=404)
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
-    return render(request, 'sales/pos_screen.html', {'products': products})
-
+    return render(request, 'sales/pos_screen.html', {
+        'products': products,
+        'store': user_store
+    })
 @login_required
 def main_dashboard(request):
     """The main Owner's Dashboard with financial data, inventory, and staff."""
