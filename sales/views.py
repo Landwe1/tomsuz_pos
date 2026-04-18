@@ -70,37 +70,43 @@ def pos_screen(request):
 
 @login_required
 def main_dashboard(request):
-    """The main Owner's Dashboard with financial data and inventory."""
+    """The main Owner's Dashboard with financial data, inventory, and staff."""
     
     # 1. Safely get or create the profile to prevent Error 500
     profile, created = Profile.objects.get_or_create(
         user=request.user, 
-        defaults={'role': 'OWNER'} # Default new test accounts to OWNER
+        defaults={'role': 'OWNER'}
     )
 
-    # 2. Check role (ensure it's not a cashier trying to see the owner dashboard)
+    # 2. Check role
     if profile.role != 'OWNER':
         return redirect('pos_screen')
 
     user_store = profile.store
 
-    # 3. Handle Store Creation if the new account doesn't have one yet
+    # 3. Handle Store Creation
     if not user_store:
         if request.method == "POST":
             action = request.POST.get('action')
             if action == "create":
                 store_name = request.POST.get('store_name')
-                # Only create if name is provided
                 if store_name:
                     new_store = Store.objects.create(owner=request.user, name=store_name)
                     profile.store = new_store
                     profile.save()
                     return redirect('main_dashboard')
         
-        # This renders the "Name your store" page for new accounts
         return render(request, 'sales/store_choice.html')
 
-    # 4. Data Calculations (Safe for new stores with 0 sales)
+    # --- NEW: Fetch Staff for the Dashboard table ---
+    # This finds all users linked to this store and excludes the owner
+    staff = User.objects.filter(
+        profile__store=user_store
+    ).exclude(
+        id=request.user.id
+    ).select_related('profile')
+
+    # 4. Data Calculations
     now = timezone.now()
     today = now.date()
     store_sales = Sale.objects.filter(store=user_store)
@@ -110,11 +116,13 @@ def main_dashboard(request):
     
     inventory = Product.objects.filter(store=user_store).order_by('stock_quantity')
 
+    # 5. Add 'staff' to the context so the template can see it
     context = {
         'store': user_store,
         'today_total': today_total,
         'month_total': month_total,
         'inventory': inventory,
+        'staff': staff,  # This is the missing piece!
     }
     return render(request, 'sales/dashboard.html', context)
 
