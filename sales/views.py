@@ -93,7 +93,7 @@ def main_dashboard(request):
 
     # 2. Check role
     if profile.role != 'OWNER':
-        return redirect('pos_screen')
+        return redirect('sales:pos_screen')
 
     user_store = profile.store
 
