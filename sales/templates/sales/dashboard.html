@@ -122,15 +122,19 @@
             </div>
 
             <div class="col-lg-6 mb-4">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                        <h6 class="m-0 font-weight-bold text-primary">Inventory Stock</h6>
-                        {% if request.user.profile.role == 'OWNER' %}
-                        <button type="button" class="btn btn-sm btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#addProductModal">
-                            <i class="bi bi-plus-circle me-1"></i> Add Product
-                        </button>
-                        {% endif %}
-                    </div>
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+    <h6 class="m-0 font-weight-bold text-primary">Inventory Stock</h6>
+    {% if request.user.profile.role == 'OWNER' %}
+    <div class="btn-group">
+        <a href="{% url 'sales:manage_inventory' %}" class="btn btn-sm btn-outline-primary shadow-sm me-2">
+            <i class="bi bi-pencil-square me-1"></i> Manage
+        </a>
+        <button type="button" class="btn btn-sm btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#addProductModal">
+            <i class="bi bi-plus-circle me-1"></i> Add
+        </a>
+    </div>
+    {% endif %}
+</div>
                     <div class="card-body">
                         <div class="table-responsive">
                             <table class="table table-hover align-middle">
