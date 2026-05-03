@@ -5,7 +5,7 @@ from django.dispatch import receiver
 from products.models import Product
 
 class Store(models.Model):
-    """The central business entity. Every shop owner gets one of these."""
+    """The central business entity."""
     name = models.CharField(max_length=100)
     owner = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='owned_store')
     address = models.TextField(blank=True, null=True)
@@ -16,7 +16,6 @@ class Store(models.Model):
         return self.name
 
 class Profile(models.Model):
-    """Extends the User to link them to a Store and a Role."""
     USER_ROLES = [
         ('OWNER', 'Shop Owner'),
         ('CASHIER', 'Cashier'),
@@ -58,17 +57,35 @@ class Sale(models.Model):
         store_name = self.store.name if self.store else "Unassigned Store"
         return f"Sale #{self.id} - {store_name} - K{self.total_amount}"
 
+    # NEW: Calculate total profit for the whole receipt
+    def get_total_profit(self):
+        return sum(item.profit for item in self.items.all())
+
 class SaleItem(models.Model):
     sale = models.ForeignKey(Sale, related_name='items', on_delete=models.CASCADE)
     product = models.ForeignKey(Product, on_delete=models.PROTECT)
     quantity = models.DecimalField(max_digits=10, decimal_places=2, default=1.00)
-    unit_price = models.DecimalField(max_digits=10, decimal_places=2) 
+    
+    # NEW: We capture these from the Product model at time of sale
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2) # The price actually charged (after discount)
+    cost_price = models.DecimalField(max_digits=10, decimal_places=2, editable=False) # The buying price
+    
     subtotal = models.DecimalField(max_digits=10, decimal_places=2, editable=False)
 
+    @property
+    def profit(self):
+        """Calculates profit for this specific line item."""
+        return self.subtotal - (self.cost_price * self.quantity)
+
     def save(self, *args, **kwargs):
+        # Calculate subtotal based on the actual price charged
         self.subtotal = self.unit_price * self.quantity
         
+        # When first created, lock in the cost price from the Product model
         if not self.pk:
+            self.cost_price = self.product.buying_price # Ensure your Product model has 'buying_price'
+            
+            # Stock management logic
             if self.product.stock_quantity >= self.quantity:
                 self.product.stock_quantity -= self.quantity
                 self.product.save()
@@ -79,12 +96,11 @@ class SaleItem(models.Model):
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
 def create_user_profile(sender, instance, created, **kwargs):
-    """Creates a Profile only when a new User is created."""
     if created:
         Profile.objects.get_or_create(user=instance)
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
 def save_user_profile(sender, instance, **kwargs):
-    """Saves the Profile whenever the User is saved."""
     if hasattr(instance, 'profile'):
         instance.profile.save()
+
