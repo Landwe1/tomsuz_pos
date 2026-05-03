@@ -39,22 +39,27 @@ def pos_screen(request):
         try:
             data = json.loads(request.body)
 
+            # --- EXTRA PROTECTION: Check for empty values from JS ---
+            def to_decimal(value):
+                if value is None or str(value).strip() == "":
+                    return Decimal('0.00')
+                return Decimal(str(value))
+
             with transaction.atomic():
                 new_sale = Sale.objects.create(
                     cashier=request.user,
                     store=user_store,
-                    total_amount=Decimal(str(data['total_amount'])),
-                    amount_paid=Decimal(str(data['amount_paid'])),
-                    change_due=Decimal(str(data['change_due'])),
-                    payment_method=data['payment_method']
+                    total_amount=to_decimal(data.get('total_amount')),
+                    amount_paid=to_decimal(data.get('amount_paid')),
+                    change_due=to_decimal(data.get('change_due')),
+                    payment_method=data.get('payment_method', 'CASH')
                 )
 
-                for item in data['cart']:
+                for item in data.get('cart', []):
                     product = Product.objects.get(id=item['id'], store=user_store)
+                    charged_price = to_decimal(item.get('price'))
 
-                    charged_price = Decimal(str(item['price']))
-
-                    # ✅ Price protection (NEW)
+                    # Price protection
                     if charged_price < product.min_price:
                         raise ValueError(
                             f"Price for {product.name} cannot be lower than K{product.min_price}"
@@ -74,7 +79,7 @@ def pos_screen(request):
         except ValueError as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
         except Exception as e:
-            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+            return JsonResponse({'status': 'error', 'message': f"Server Error: {str(e)}"}, status=400)
 
     return render(request, 'sales/pos_screen.html', {
         'products': products,
@@ -159,23 +164,32 @@ def manage_inventory(request):
         action = request.POST.get('action')
 
         if action == "restock":
-            added_qty = Decimal(request.POST.get('added_stock', 0))
+            # Fallback to '0' if the field is empty
+            added_qty_raw = request.POST.get('added_stock') or '0'
+            added_qty = Decimal(str(added_qty_raw))
             product.stock_quantity += added_qty
             messages.success(request, f"Added {added_qty} units to {product.name}")
 
         elif action == "edit":
-            product.stock_quantity = Decimal(request.POST.get('stock'))
-            product.buying_price = Decimal(request.POST.get('buying_price'))
-            product.selling_price = Decimal(request.POST.get('price'))
-            product.min_price = Decimal(request.POST.get('min_price'))
+            # Safely grab values or default to current value/zero
+            stock = request.POST.get('stock') or '0'
+            b_price = request.POST.get('buying_price') or '0'
+            s_price = request.POST.get('price') or '0'
+            m_price = request.POST.get('min_price') or '0'
+
+            product.stock_quantity = Decimal(str(stock))
+            product.buying_price = Decimal(str(b_price))
+            product.selling_price = Decimal(str(s_price))
+            product.min_price = Decimal(str(m_price))
+            
             messages.success(request, f"Updated {product.name}")
 
         product.save()
         return redirect('sales:manage_inventory')
 
+    # This is the list that shows up on your page
     products = Product.objects.filter(store=profile.store).order_by('name')
     return render(request, 'sales/manage_inventory.html', {'products': products})
-
 
 # ===================== ADD PRODUCT =====================
 @login_required
@@ -188,19 +202,34 @@ def add_product(request):
 
     if request.method == 'POST':
         try:
+            # We use 'or 0' so if the user leaves a box empty, the system doesn't crash
+            name = request.POST.get('name')
+            b_price = request.POST.get('buying_price') or '0'
+            s_price = request.POST.get('price') or '0'
+            m_price = request.POST.get('min_price') or '0'
+            stock = request.POST.get('stock') or '0'
+
+            # Validating that name exists at least
+            if not name:
+                messages.error(request, "Product name is required")
+                return redirect('sales:manage_inventory')
+
             Product.objects.create(
                 store=profile.store,
-                name=request.POST.get('name'),
-                buying_price=Decimal(request.POST.get('buying_price')),
-                selling_price=Decimal(request.POST.get('price')),
-                min_price=Decimal(request.POST.get('min_price')),
-                stock_quantity=Decimal(request.POST.get('stock'))
+                name=name,
+                buying_price=Decimal(str(b_price)),
+                selling_price=Decimal(str(s_price)),
+                min_price=Decimal(str(m_price)),
+                stock_quantity=Decimal(str(stock))
             )
-            messages.success(request, "Product added successfully")
+            messages.success(request, f"Product '{name}' added successfully")
         except Exception as e:
-            messages.error(request, str(e))
+            # This will now catch any other weird errors and show them as a message
+            messages.error(request, f"Could not add product: {str(e)}")
 
     return redirect('sales:manage_inventory')
+
+
 
 
 # ===================== STAFF =====================
@@ -253,9 +282,10 @@ def toggle_cashier_status(request, user_id):
     if request.user.profile.role != 'OWNER':
         return redirect('sales:pos_screen')
 
+    # Ensure we only fetch users belonging to THIS owner's store
     cashier = get_object_or_404(
-        User,
-        id=user_id,
+        User, 
+        id=user_id, 
         profile__store=request.user.profile.store
     )
 
@@ -264,9 +294,13 @@ def toggle_cashier_status(request, user_id):
     else:
         cashier.is_active = not cashier.is_active
         cashier.save()
+        
+        # ADD THIS: Let the owner know what happened
+        status = "active" if cashier.is_active else "deactivated"
+        messages.success(request, f"User {cashier.username} is now {status}.")
 
+    # Make sure this name matches your urls.py exactly
     return redirect('sales:manage_staff')
-
 
 # ===================== SALES =====================
 @login_required
