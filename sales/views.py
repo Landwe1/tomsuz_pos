@@ -1,15 +1,23 @@
 import json
 from decimal import Decimal
+
+# Django Core Shortcuts and HTTP
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
-from django.db.models import Sum
+
+# Django Database and Utils
 from django.db import transaction
+from django.db.models import Sum
 from django.utils import timezone
+
+# Django Auth and Messages
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from django.contrib import messages
 
-from products.models import Product
+# Model Imports
+# Note: Ensure these paths match your actual app names
+from products.models import Product 
 from .models import Sale, SaleItem, Profile, Store
 
 
@@ -147,6 +155,7 @@ def main_dashboard(request):
 
 
 # ===================== INVENTORY =====================
+
 @login_required
 def manage_inventory(request):
     profile = request.user.profile
@@ -166,70 +175,99 @@ def manage_inventory(request):
         if action == "restock":
             # Fallback to '0' if the field is empty
             added_qty_raw = request.POST.get('added_stock') or '0'
-            added_qty = Decimal(str(added_qty_raw))
-            product.stock_quantity += added_qty
-            messages.success(request, f"Added {added_qty} units to {product.name}")
+            try:
+                added_qty = Decimal(str(added_qty_raw))
+                product.stock_quantity += added_qty
+                messages.success(request, f"Added {added_qty} units to {product.name}")
+            except Exception:
+                messages.error(request, "Invalid stock quantity entered.")
 
         elif action == "edit":
-            # Safely grab values or default to current value/zero
+            # Safely grab values from your HTML names: 'stock', 'buying_price', 'price', 'min_price'
             stock = request.POST.get('stock') or '0'
             b_price = request.POST.get('buying_price') or '0'
             s_price = request.POST.get('price') or '0'
             m_price = request.POST.get('min_price') or '0'
 
-            product.stock_quantity = Decimal(str(stock))
-            product.buying_price = Decimal(str(b_price))
-            product.selling_price = Decimal(str(s_price))
-            product.min_price = Decimal(str(m_price))
-            
-            messages.success(request, f"Updated {product.name}")
+            try:
+                # Convert inputs to Decimal
+                new_stock = Decimal(str(stock))
+                new_buying = Decimal(str(b_price))
+                new_selling = Decimal(str(s_price))
+                new_min = Decimal(str(m_price))
+
+                # Simple Logic Check: Don't let min_price be higher than selling_price
+                if new_min > new_selling:
+                    messages.warning(request, f"Warning: Min price for {product.name} is higher than selling price.")
+
+                # Update the product object
+                product.stock_quantity = new_stock
+                product.buying_price = new_buying
+                product.selling_price = new_selling
+                product.min_price = new_min
+                
+                messages.success(request, f"Updated {product.name} details successfully.")
+            except Exception as e:
+                messages.error(request, f"Error updating {product.name}: Check your price formats.")
 
         product.save()
         return redirect('sales:manage_inventory')
 
-    # This is the list that shows up on your page
+    # Filter products by the owner's specific store
     products = Product.objects.filter(store=profile.store).order_by('name')
     return render(request, 'sales/manage_inventory.html', {'products': products})
 
 # ===================== ADD PRODUCT =====================
+
+
 @login_required
 def add_product(request):
     profile = request.user.profile
 
     if profile.role != 'OWNER':
-        messages.error(request, "Unauthorized")
+        messages.error(request, "Unauthorized: Only owners can add products.")
         return redirect('sales:manage_inventory')
 
     if request.method == 'POST':
         try:
-            # We use 'or 0' so if the user leaves a box empty, the system doesn't crash
+            # Grabbing data from your HTML modal names
             name = request.POST.get('name')
             b_price = request.POST.get('buying_price') or '0'
-            s_price = request.POST.get('price') or '0'
-            m_price = request.POST.get('min_price') or '0'
+            s_price = request.POST.get('price') or '0'       # Matches name="price" in your HTML
+            m_price = request.POST.get('min_price') or '0'   # Matches name="min_price" in your HTML
             stock = request.POST.get('stock') or '0'
 
-            # Validating that name exists at least
             if not name:
-                messages.error(request, "Product name is required")
+                messages.error(request, "Product name is required.")
                 return redirect('sales:manage_inventory')
 
+            # Convert to Decimals for precision
+            buying_decimal = Decimal(str(b_price))
+            selling_decimal = Decimal(str(s_price))
+            min_decimal = Decimal(str(m_price))
+            stock_decimal = Decimal(str(stock))
+
+            # Validation: Ensure min price isn't impossible
+            if min_decimal > selling_decimal:
+                messages.warning(request, f"Note: Minimum price for {name} is set higher than the selling price.")
+
+            # Creating the object in the database
             Product.objects.create(
                 store=profile.store,
                 name=name,
-                buying_price=Decimal(str(b_price)),
-                selling_price=Decimal(str(s_price)),
-                min_price=Decimal(str(m_price)),
-                stock_quantity=Decimal(str(stock))
+                buying_price=buying_decimal,
+                selling_price=selling_decimal,
+                min_price=min_decimal,
+                stock_quantity=stock_decimal
             )
-            messages.success(request, f"Product '{name}' added successfully")
+            
+            messages.success(request, f"Product '{name}' added successfully.")
+
         except Exception as e:
-            # This will now catch any other weird errors and show them as a message
+            # This captures database errors or decimal conversion errors
             messages.error(request, f"Could not add product: {str(e)}")
 
     return redirect('sales:manage_inventory')
-
-
 
 
 # ===================== STAFF =====================

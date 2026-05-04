@@ -50,17 +50,34 @@ class SaleItem(models.Model):
     quantity = models.DecimalField(max_digits=10, decimal_places=2, default=1.00)
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     cost_price = models.DecimalField(max_digits=10, decimal_places=2, editable=False)
+    # Recommended: track the min_price allowed at the time of sale
+    min_price_allowed = models.DecimalField(max_digits=10, decimal_places=2, editable=False)
     subtotal = models.DecimalField(max_digits=10, decimal_places=2, editable=False)
+
     @property
     def profit(self):
         return self.subtotal - (self.cost_price * self.quantity)
+
     def save(self, *args, **kwargs):
+        # 1. Check if the price is below the allowed minimum
+        if self.unit_price < self.product.min_price:
+            raise ValueError(f"Price cannot be lower than K{self.product.min_price}")
+
+        # 2. Calculate subtotal
         self.subtotal = self.unit_price * self.quantity
+
+        # 3. Handle New Items
         if not self.pk:
             self.cost_price = self.product.buying_price
+            self.min_price_allowed = self.product.min_price # Snapshot of the rule
+            
+            # 4. Stock Management
             if self.product.stock_quantity >= self.quantity:
                 self.product.stock_quantity -= self.quantity
                 self.product.save()
+            else:
+                raise ValueError("Not enough stock available")
+
         super().save(*args, **kwargs)
 
 # --- REFINED SIGNALS ---
