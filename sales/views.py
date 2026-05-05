@@ -15,6 +15,9 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 
+from django.utils import timezone
+from datetime import timedelta
+from django.db.models import Sum
 # Model Imports
 # Note: Ensure these paths match your actual app names
 from products.models import Product 
@@ -96,6 +99,8 @@ def pos_screen(request):
 
 
 # ===================== DASHBOARD =====================
+
+
 @login_required
 def main_dashboard(request):
     profile, _ = Profile.objects.get_or_create(
@@ -108,7 +113,7 @@ def main_dashboard(request):
 
     user_store = profile.store
 
-    # Store creation
+    # Store creation logic
     if not user_store:
         if request.method == "POST":
             store_name = request.POST.get('store_name')
@@ -124,7 +129,7 @@ def main_dashboard(request):
 
     store_sales = Sale.objects.filter(store=user_store)
 
-    # Revenue
+    # 1. Revenue Calculations
     today_total = store_sales.filter(timestamp__date=today).aggregate(
         Sum('total_amount')
     )['total_amount__sum'] or 0
@@ -134,12 +139,30 @@ def main_dashboard(request):
         timestamp__year=now.year
     ).aggregate(Sum('total_amount'))['total_amount__sum'] or 0
 
-    # ✅ Profit (NEW)
+    # 2. Profit Calculation
     today_sales = store_sales.filter(timestamp__date=today)
     today_profit = sum(sale.get_total_profit() for sale in today_sales)
 
-    inventory = Product.objects.filter(store=user_store).order_by('stock_quantity')
+    # 3. Low Stock Calculation (Fixes the "0" issue)
+    low_stock_threshold = 5
+    low_stock_count = Product.objects.filter(
+        store=user_store, 
+        stock_quantity__lte=low_stock_threshold
+    ).count()
 
+    # 4. 7-Day Sales Trend Logic (Fixes the flat graph)
+    start_date = today - timedelta(days=6)
+    daily_sales = store_sales.filter(
+        timestamp__date__range=[start_date, today]
+    ).values('timestamp__date').annotate(total=Sum('total_amount')).order_by('timestamp__date')
+
+    # Map database results to the last 7 days (filling gaps with 0)
+    sales_dict = {s['timestamp__date']: s['total'] for s in daily_sales}
+    chart_data = [float(sales_dict.get(start_date + timedelta(days=i), 0)) for i in range(7)]
+    chart_labels = [(start_date + timedelta(days=i)).strftime('%a') for i in range(7)]
+
+    # 5. Inventory and Staff
+    inventory = Product.objects.filter(store=user_store).order_by('stock_quantity')
     staff = User.objects.filter(
         profile__store=user_store
     ).exclude(id=request.user.id).select_related('profile')
@@ -149,6 +172,10 @@ def main_dashboard(request):
         'today_total': today_total,
         'month_total': month_total,
         'today_profit': today_profit,
+        'low_stock_count': low_stock_count, # Added this
+        'chart_data': chart_data,           # Added this for the graph
+        'chart_labels': chart_labels,       # Added this for the graph
+        'today_date': today.strftime('%d %b %Y'),
         'inventory': inventory,
         'staff_members': staff,
     })
