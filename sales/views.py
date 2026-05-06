@@ -1,5 +1,6 @@
 import json
 from decimal import Decimal
+from datetime import timedelta
 
 # Django Core Shortcuts and HTTP
 from django.shortcuts import render, redirect, get_object_or_404
@@ -7,7 +8,7 @@ from django.http import JsonResponse
 
 # Django Database and Utils
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Sum, F  # Combined these here
 from django.utils import timezone
 
 # Django Auth and Messages
@@ -15,17 +16,10 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 
-from django.utils import timezone
-from datetime import timedelta
-from django.db.models import Sum
-
-from django.db.models import Sum, F
-from datetime import timedelta
-
 # Model Imports
-# Note: Ensure these paths match your actual app names
 from products.models import Product 
 from .models import Sale, SaleItem, Profile, Store
+
 
 
 # ===================== POS SCREEN =====================
