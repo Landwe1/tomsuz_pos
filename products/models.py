@@ -1,5 +1,6 @@
 from django.db import models
 
+
 class Category(models.Model):
     # Added store so each shop has its own categories
     store = models.ForeignKey('sales.Store', on_delete=models.CASCADE, related_name='categories', null=True)
@@ -11,6 +12,7 @@ class Category(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.store.name if self.store else 'Global'})"
+
 
 
 class Product(models.Model):
@@ -29,11 +31,9 @@ class Product(models.Model):
     unit_type = models.CharField(max_length=2, choices=UNIT_CHOICES, default='PC')
     
     # --- PRICE SECTION ---
-    # Renamed to buying_price to match your SaleItem logic
     buying_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True) 
     selling_price = models.DecimalField(max_digits=10, decimal_places=2) 
     
-    # NEW: The lowest price a cashier is allowed to sell for
     min_price = models.DecimalField(
         max_digits=10, 
         decimal_places=2, 
@@ -52,3 +52,19 @@ class Product(models.Model):
     @property
     def is_low_stock(self):
         return self.stock_quantity <= self.low_stock_threshold
+
+    # --- NEW CALCULATED FIELDS ---
+    
+    @property
+    def stock_value(self):
+        """Calculates total value of current stock based on selling price"""
+        if self.stock_quantity and self.selling_price:
+            return self.stock_quantity * self.selling_price
+        return 0.00
+
+    @property
+    def potential_profit(self):
+        """Calculates potential profit for remaining stock (Selling Price - Buying Price)"""
+        if self.stock_quantity and self.selling_price and self.buying_price:
+            return self.stock_quantity * (self.selling_price - self.buying_price)
+        return 0.00
