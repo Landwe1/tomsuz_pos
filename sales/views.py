@@ -18,6 +18,10 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from datetime import timedelta
 from django.db.models import Sum
+
+from django.db.models import Sum, F
+from datetime import timedelta
+
 # Model Imports
 # Note: Ensure these paths match your actual app names
 from products.models import Product 
@@ -126,7 +130,6 @@ def main_dashboard(request):
 
     now = timezone.now()
     today = now.date()
-
     store_sales = Sale.objects.filter(store=user_store)
 
     # 1. Revenue Calculations
@@ -143,14 +146,20 @@ def main_dashboard(request):
     today_sales = store_sales.filter(timestamp__date=today)
     today_profit = sum(sale.get_total_profit() for sale in today_sales)
 
-    # 3. Low Stock Calculation (Fixes the "0" issue)
+    # 3. Low Stock Calculation
     low_stock_threshold = 5
     low_stock_count = Product.objects.filter(
         store=user_store, 
         stock_quantity__lte=low_stock_threshold
     ).count()
 
-    # 4. 7-Day Sales Trend Logic (Fixes the flat graph)
+    # 4. Total Stock Value Calculation (New Logic Added)
+    # This multiplies the quantity by price for every product in this specific store
+    total_inventory_value = Product.objects.filter(store=user_store).aggregate(
+        total=Sum(F('stock_quantity') * F('selling_price'))
+    )['total'] or 0
+
+    # 5. 7-Day Sales Trend Logic
     start_date = today - timedelta(days=6)
     daily_sales = store_sales.filter(
         timestamp__date__range=[start_date, today]
@@ -161,7 +170,7 @@ def main_dashboard(request):
     chart_data = [float(sales_dict.get(start_date + timedelta(days=i), 0)) for i in range(7)]
     chart_labels = [(start_date + timedelta(days=i)).strftime('%a') for i in range(7)]
 
-    # 5. Inventory and Staff
+    # 6. Inventory and Staff
     inventory = Product.objects.filter(store=user_store).order_by('stock_quantity')
     staff = User.objects.filter(
         profile__store=user_store
@@ -172,9 +181,10 @@ def main_dashboard(request):
         'today_total': today_total,
         'month_total': month_total,
         'today_profit': today_profit,
-        'low_stock_count': low_stock_count, # Added this
-        'chart_data': chart_data,           # Added this for the graph
-        'chart_labels': chart_labels,       # Added this for the graph
+        'low_stock_count': low_stock_count,
+        'total_inventory_value': total_inventory_value, # Sent to template
+        'chart_data': chart_data,
+        'chart_labels': chart_labels,
         'today_date': today.strftime('%d %b %Y'),
         'inventory': inventory,
         'staff_members': staff,
