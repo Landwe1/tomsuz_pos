@@ -14,7 +14,6 @@ class Category(models.Model):
         return f"{self.name} ({self.store.name if self.store else 'Global'})"
 
 
-
 class Product(models.Model):
     UNIT_CHOICES = [
         ('PC', 'Piece / Item'),
@@ -23,7 +22,10 @@ class Product(models.Model):
         ('LT', 'Litre (L)'),
     ]
 
+    # --- TENANCY INTEGRATION ---
     store = models.ForeignKey('sales.Store', on_delete=models.CASCADE, related_name='inventory', null=True)
+    
+    # --- CORE DETAILS ---
     name = models.CharField(max_length=200)
     description = models.TextField(blank=True, null=True)
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True)
@@ -33,17 +35,20 @@ class Product(models.Model):
     # --- PRICE SECTION ---
     buying_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True) 
     selling_price = models.DecimalField(max_digits=10, decimal_places=2) 
-    
     min_price = models.DecimalField(
         max_digits=10, 
         decimal_places=2, 
         default=0.00, 
         help_text="Minimum allowed selling price"
     )
-    # ---------------------
 
+    # --- INVENTORY TRACKING ---
     stock_quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, help_text="Use decimals for KG items")
     low_stock_threshold = models.DecimalField(max_digits=10, decimal_places=2, default=5.00)
+    
+    # --- TIMESTAMPS (Fixes admin check errors) ---
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     last_restocked = models.DateTimeField(auto_now=True)
 
     def __str__(self):
@@ -53,7 +58,7 @@ class Product(models.Model):
     def is_low_stock(self):
         return self.stock_quantity <= self.low_stock_threshold
 
-    # --- NEW CALCULATED FIELDS ---
+    # --- CALCULATED PROPERTIES ---
     
     @property
     def stock_value(self):

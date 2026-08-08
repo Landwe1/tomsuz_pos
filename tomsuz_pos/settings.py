@@ -19,7 +19,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-myv5$_r-g3_+r^zk41g&md#+3q3akucd&vpjqfvwiqb3a_5#-&'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-# Set to False for the live site!
 DEBUG = False
 
 # Security: Allow PythonAnywhere to run your site
@@ -95,14 +94,21 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'Africa/Lusaka' # Updated to your local time!
+TIME_ZONE = 'Africa/Lusaka'
 USE_I18N = True
 USE_TZ = True
 
-# Static files
+# Static files (CSS, JavaScript, Images)
 STATIC_URL = 'static/'
+
+# Source directory for custom static assets (manifest.json, serviceworker.js, images)
+STATICFILES_DIRS = [
+    BASE_DIR / 'staticfiles',
+]
+
+# Destination directory where collectstatic outputs compiled assets
 STATIC_ROOT = BASE_DIR / 'static'
 
 # Default primary key field type
-# This fixes the 6 warnings you were getting!
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+

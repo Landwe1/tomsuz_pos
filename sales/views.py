@@ -8,7 +8,7 @@ from django.http import JsonResponse
 
 # Django Database and Utils
 from django.db import transaction
-from django.db.models import Sum, F  # Combined these here
+from django.db.models import Sum, F
 from django.utils import timezone
 
 # Django Auth and Messages
@@ -16,13 +16,14 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 
-# Model Imports
+# Model Imports (Cleaned up from cross-app layers)
 from products.models import Product 
 from .models import Sale, SaleItem, Profile, Store
 
 
 
 # ===================== POS SCREEN =====================
+
 @login_required
 def pos_screen(request):
     try:
@@ -65,8 +66,10 @@ def pos_screen(request):
                 )
 
                 for item in data.get('cart', []):
-                    product = Product.objects.get(id=item['id'], store=user_store)
+                    # select_for_update prevents simultaneous checkout collisions
+                    product = Product.objects.select_for_update().get(id=item['id'], store=user_store)
                     charged_price = to_decimal(item.get('price'))
+                    requested_qty = Decimal(str(item.get('quantity', 1)))
 
                     # Price protection
                     if charged_price < product.min_price:
@@ -74,10 +77,20 @@ def pos_screen(request):
                             f"Price for {product.name} cannot be lower than K{product.min_price}"
                         )
 
+                    # --- FIXED: INVENTORY DEDUCTION ENGINE ---
+                    if product.stock_quantity < requested_qty:
+                        raise ValueError(
+                            f"Insufficient stock for {product.name}. Only {product.stock_quantity} available."
+                        )
+                    
+                    product.stock_quantity -= requested_qty
+                    product.save()
+                    # ----------------------------------------
+
                     SaleItem.objects.create(
                         sale=new_sale,
                         product=product,
-                        quantity=item['quantity'],
+                        quantity=requested_qty,
                         unit_price=charged_price
                     )
 
@@ -97,6 +110,7 @@ def pos_screen(request):
 
 
 # ===================== DASHBOARD =====================
+
 
 
 @login_required
@@ -122,8 +136,11 @@ def main_dashboard(request):
                 return redirect('sales:main_dashboard')
         return render(request, 'sales/store_choice.html')
 
-    now = timezone.now()
-    today = now.date()
+    # --- TIME ZONE LOCALIZATION CORRECTION ---
+    # timezone.localdate() evaluates date bounds contextually matching 'Africa/Lusaka'
+    today = timezone.localdate()
+    now_local = timezone.localtime()
+    
     store_sales = Sale.objects.filter(store=user_store)
 
     # 1. Revenue Calculations
@@ -131,24 +148,23 @@ def main_dashboard(request):
         Sum('total_amount')
     )['total_amount__sum'] or 0
 
+    # Evaluates matching active localized calendar months
     month_total = store_sales.filter(
-        timestamp__month=now.month,
-        timestamp__year=now.year
+        timestamp__month=now_local.month,
+        timestamp__year=now_local.year
     ).aggregate(Sum('total_amount'))['total_amount__sum'] or 0
 
-    # 2. Profit Calculation
-    today_sales = store_sales.filter(timestamp__date=today)
+    # 2. Profit Calculation (Optimized using prefetch_related)
+    today_sales = store_sales.filter(timestamp__date=today).prefetch_related('items__product')
     today_profit = sum(sale.get_total_profit() for sale in today_sales)
 
     # 3. Low Stock Calculation
-    low_stock_threshold = 5
     low_stock_count = Product.objects.filter(
         store=user_store, 
-        stock_quantity__lte=low_stock_threshold
+        stock_quantity__lte=F('low_stock_threshold')
     ).count()
 
-    # 4. Total Stock Value Calculation (New Logic Added)
-    # This multiplies the quantity by price for every product in this specific store
+    # 4. Total Stock Value Calculation
     total_inventory_value = Product.objects.filter(store=user_store).aggregate(
         total=Sum(F('stock_quantity') * F('selling_price'))
     )['total'] or 0
@@ -176,13 +192,15 @@ def main_dashboard(request):
         'month_total': month_total,
         'today_profit': today_profit,
         'low_stock_count': low_stock_count,
-        'total_inventory_value': total_inventory_value, # Sent to template
+        'total_inventory_value': total_inventory_value,
         'chart_data': chart_data,
         'chart_labels': chart_labels,
-        'today_date': today.strftime('%d %b %Y'),
+        'today_date': today.strftime('%d %b %Y'), # Will show 13 Jun 2026 correctly now!
         'inventory': inventory,
         'staff_members': staff,
     })
+
+
 
 
 # ===================== INVENTORY =====================
@@ -204,7 +222,6 @@ def manage_inventory(request):
         action = request.POST.get('action')
 
         if action == "restock":
-            # Fallback to '0' if the field is empty
             added_qty_raw = request.POST.get('added_stock') or '0'
             try:
                 added_qty = Decimal(str(added_qty_raw))
@@ -214,24 +231,20 @@ def manage_inventory(request):
                 messages.error(request, "Invalid stock quantity entered.")
 
         elif action == "edit":
-            # Safely grab values from your HTML names: 'stock', 'buying_price', 'price', 'min_price'
             stock = request.POST.get('stock') or '0'
             b_price = request.POST.get('buying_price') or '0'
             s_price = request.POST.get('price') or '0'
             m_price = request.POST.get('min_price') or '0'
 
             try:
-                # Convert inputs to Decimal
                 new_stock = Decimal(str(stock))
                 new_buying = Decimal(str(b_price))
                 new_selling = Decimal(str(s_price))
                 new_min = Decimal(str(m_price))
 
-                # Simple Logic Check: Don't let min_price be higher than selling_price
                 if new_min > new_selling:
                     messages.warning(request, f"Warning: Min price for {product.name} is higher than selling price.")
 
-                # Update the product object
                 product.stock_quantity = new_stock
                 product.buying_price = new_buying
                 product.selling_price = new_selling
@@ -244,12 +257,11 @@ def manage_inventory(request):
         product.save()
         return redirect('sales:manage_inventory')
 
-    # Filter products by the owner's specific store
     products = Product.objects.filter(store=profile.store).order_by('name')
     return render(request, 'sales/manage_inventory.html', {'products': products})
 
-# ===================== ADD PRODUCT =====================
 
+# ===================== ADD PRODUCT =====================
 
 @login_required
 def add_product(request):
@@ -261,47 +273,46 @@ def add_product(request):
 
     if request.method == 'POST':
         try:
-            # Grabbing data from your HTML modal names
             name = request.POST.get('name')
             b_price = request.POST.get('buying_price') or '0'
-            s_price = request.POST.get('price') or '0'       # Matches name="price" in your HTML
-            m_price = request.POST.get('min_price') or '0'   # Matches name="min_price" in your HTML
+            s_price = request.POST.get('price') or '0'       
+            m_price = request.POST.get('min_price') or '0'   
             stock = request.POST.get('stock') or '0'
+            # Grab the custom threshold, defaulting to 5.00 if left empty
+            threshold = request.POST.get('low_stock_threshold') or '5.00'
 
             if not name:
                 messages.error(request, "Product name is required.")
                 return redirect('sales:manage_inventory')
 
-            # Convert to Decimals for precision
             buying_decimal = Decimal(str(b_price))
             selling_decimal = Decimal(str(s_price))
             min_decimal = Decimal(str(m_price))
             stock_decimal = Decimal(str(stock))
+            threshold_decimal = Decimal(str(threshold)) # Parsed into decimal safely
 
-            # Validation: Ensure min price isn't impossible
             if min_decimal > selling_decimal:
                 messages.warning(request, f"Note: Minimum price for {name} is set higher than the selling price.")
 
-            # Creating the object in the database
             Product.objects.create(
                 store=profile.store,
                 name=name,
                 buying_price=buying_decimal,
                 selling_price=selling_decimal,
                 min_price=min_decimal,
-                stock_quantity=stock_decimal
+                stock_quantity=stock_decimal,
+                low_stock_threshold=threshold_decimal # Committed to database record
             )
             
             messages.success(request, f"Product '{name}' added successfully.")
 
         except Exception as e:
-            # This captures database errors or decimal conversion errors
             messages.error(request, f"Could not add product: {str(e)}")
 
     return redirect('sales:manage_inventory')
 
-
 # ===================== STAFF =====================
+
 @login_required
 def manage_staff(request):
     profile = request.user.profile
@@ -351,7 +362,6 @@ def toggle_cashier_status(request, user_id):
     if request.user.profile.role != 'OWNER':
         return redirect('sales:pos_screen')
 
-    # Ensure we only fetch users belonging to THIS owner's store
     cashier = get_object_or_404(
         User, 
         id=user_id, 
@@ -364,14 +374,14 @@ def toggle_cashier_status(request, user_id):
         cashier.is_active = not cashier.is_active
         cashier.save()
         
-        # ADD THIS: Let the owner know what happened
         status = "active" if cashier.is_active else "deactivated"
         messages.success(request, f"User {cashier.username} is now {status}.")
 
-    # Make sure this name matches your urls.py exactly
     return redirect('sales:manage_staff')
 
+
 # ===================== SALES =====================
+
 @login_required
 def sales_history(request):
     profile = request.user.profile
@@ -379,7 +389,6 @@ def sales_history(request):
         return redirect('sales:pos_screen')
 
     sales = Sale.objects.filter(store=profile.store).order_by('-timestamp')
-
     return render(request, 'sales/sales_history.html', {'sales': sales})
 
 
@@ -406,3 +415,4 @@ def delete_sale(request, sale_id):
         messages.error(request, str(e))
 
     return redirect('sales:sales_history')
+

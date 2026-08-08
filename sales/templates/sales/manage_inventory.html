@@ -27,7 +27,7 @@
                         <th>Buying (K)</th>
                         <th>Selling (K)</th>
                         <th>Min (K)</th>
-                        <th class="text-end">Action</th>
+                        <th>Alert Level</th> <th class="text-end">Action</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -39,7 +39,7 @@
                             
                             <td>
                                 <span class="fw-bold">{{ product.name }}</span>
-                                {% if product.stock_quantity <= 5 %}
+                                {% if product.is_low_stock %}
                                     <br><span class="badge bg-danger">Low Stock</span>
                                 {% endif %}
                             </td>
@@ -52,7 +52,7 @@
                             </td>
 
                             <td>
-                                <input type="number" name="stock" class="form-control form-control-sm" value="{{ product.stock_quantity }}" style="width: 70px;">
+                                <input type="number" step="0.01" name="stock" class="form-control form-control-sm" value="{{ product.stock_quantity }}" style="width: 70px;">
                             </td>
                             <td>
                                 <input type="number" step="0.01" name="buying_price" class="form-control form-control-sm" value="{{ product.buying_price }}" style="width: 90px;">
@@ -63,6 +63,9 @@
                             <td>
                                 <input type="number" step="0.01" name="min_price" class="form-control form-control-sm" value="{{ product.min_price }}" style="width: 90px;">
                             </td>
+                            <td>
+                                <input type="number" step="0.01" name="low_stock_threshold" class="form-control form-control-sm" value="{{ product.low_stock_threshold }}" style="width: 80px;">
+                            </td>
                             
                             <td class="text-end">
                                 <button type="submit" name="action" value="edit" class="btn btn-primary btn-sm">Update</button>
@@ -71,7 +74,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="7" class="text-center py-4 text-muted">No products found.</td>
+                        <td colspan="8" class="text-center py-4 text-muted">No products found.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -117,7 +120,13 @@
                         </div>
                         <div class="col-6 mb-3">
                             <label class="form-label">Initial Stock</label>
-                            <input type="number" name="stock" class="form-control" required>
+                            <input type="number" step="0.01" name="stock" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12 mb-3">
+                            <label class="form-label text-warning fw-bold">Low Stock Warning Level</label>
+                            <input type="number" step="0.01" name="low_stock_threshold" class="form-control" value="5.00" required>
                         </div>
                     </div>
                 </div>
@@ -130,4 +139,6 @@
     </div>
 </div>
 {% endblock %}
+
+
 
