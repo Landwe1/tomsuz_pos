@@ -103,11 +103,11 @@ STATIC_URL = 'static/'
 
 # Source directory for custom static assets (manifest.json, serviceworker.js, images)
 STATICFILES_DIRS = [
-    BASE_DIR / 'staticfiles',
+    BASE_DIR / 'static',
 ]
 
 # Destination directory where collectstatic outputs compiled assets
-STATIC_ROOT = BASE_DIR / 'static'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
