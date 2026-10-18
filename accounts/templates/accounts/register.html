@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container d-flex justify-content-center align-items-center py-5">
+    <div class="col-md-7 col-lg-6">
+        <div class="card border-0 shadow-lg rounded-4 p-4 p-md-5">
+            <div class="text-center mb-4">
+                <div class="bg-success bg-opacity-10 text-success rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 60px; height: 60px; font-size: 1.5rem;">
+                    <i class="bi bi-shop-window"></i>
+                </div>
+                <h2 class="fw-bold text-dark mb-1">Register New Business</h2>
+                <p class="text-muted small">Set up your merchant profile to start logging sales</p>
+            </div>
+
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-danger py-2 small rounded-3 mb-3 text-center" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i> {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <form method="post">
+                {% csrf_token %}
+
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-muted">Username</label>
+                    <input type="text" name="username" class="form-control py-2 shadow-none" required placeholder="Choose a unique username">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-muted">Email Address</label>
+                    <input type="email" name="email" class="form-control py-2 shadow-none" required placeholder="name@example.com">
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label small fw-bold text-muted">Password</label>
+                        <input type="password" name="password" class="form-control py-2 shadow-none" required placeholder="••••••••">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label small fw-bold text-muted">Confirm Password</label>
+                        <input type="password" name="confirm_password" class="form-control py-2 shadow-none" required placeholder="••••••••">
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label small fw-bold text-muted">Business / Store Name</label>
+                    <input type="text" name="store_name" class="form-control py-2 shadow-none" required placeholder="e.g. City General Enterprise">
+                </div>
+
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-success py-2.5 rounded-pill fw-bold shadow-sm">
+                        <i class="bi bi-check-circle-fill me-1"></i> Complete Registration
+                    </button>
+                </div>
+            </form>
+
+            <div class="text-center mt-4">
+                <p class="text-muted small mb-0">Already have an account? <a href="{% url 'accounts:login' %}" class="text-primary fw-bold text-decoration-none">Sign in</a></p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

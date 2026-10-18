@@ -1,11 +1,37 @@
+{% extends 'base.html' %}
+
+{% block content %}
 <div style="text-align: center; padding: 50px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
     <h1 style="color: #2c3e50;">TomSuz POS</h1>
     <p style="font-size: 1.2rem; color: #7f8c8d;">The Intelligent Retail Ecosystem for Zambia.</p>
+
     <div style="margin-top: 40px;">
-        <a href="{% url 'accounts:login' %}" style="padding: 15px 40px; background: #27ae60; color: white; text-decoration: none; border-radius: 30px; font-weight: bold;">
-            Login to My Store
-        </a>
-        <p style="margin-top: 30px; color: #95a5a6;">Want to join the ecosystem?</p>
-        <a href="#" style="color: #2980b9; text-decoration: none;">Register a New Business</a>
+        {% if request.user.is_authenticated %}
+            <!-- If already logged in, guide them directly to their portal -->
+            {% if request.user.account_profile.role == 'LENDER' or request.user.is_staff or request.user.is_superuser %}
+                <a href="{% url 'credit_scoring:lender_dashboard' %}" style="padding: 15px 40px; background: #e67e22; color: white; text-decoration: none; border-radius: 30px; font-weight: bold; display: inline-block;">
+                    Open Lender Portal
+                </a>
+            {% else %}
+                <a href="{% url 'sales:main_dashboard' %}" style="padding: 15px 40px; background: #27ae60; color: white; text-decoration: none; border-radius: 30px; font-weight: bold; display: inline-block; margin-right: 10px;">
+                    Go to Dashboard
+                </a>
+                <a href="{% url 'credit_scoring:merchant_dashboard' %}" style="padding: 15px 40px; background: #2980b9; color: white; text-decoration: none; border-radius: 30px; font-weight: bold; display: inline-block;">
+                    View Credit Score
+                </a>
+            {% endif %}
+        {% else %}
+            <!-- If logged out -->
+            <a href="{% url 'accounts:login' %}" style="padding: 15px 40px; background: #27ae60; color: white; text-decoration: none; border-radius: 30px; font-weight: bold; display: inline-block;">
+                Login to My Store
+            </a>
+            
+            <p style="margin-top: 30px; color: #95a5a6;">Want to join the ecosystem?</p>
+            <a href="{% url 'accounts:register' %}" style="color: #2980b9; text-decoration: none; font-weight: 600;">
+                Register a New Business
+            </a>
+        {% endif %}
     </div>
 </div>
+{% endblock %}
+

@@ -29,22 +29,62 @@
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'sales:main_dashboard' %}">Dashboard</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'sales:pos_screen' %}">POS Terminal</a>
-                    </li>
-                    <li class="nav-item">
-                        <span class="nav-link text-info small">User: {{ request.user.username }}</span>
-                    </li>
+                <ul class="navbar-nav ms-auto align-items-lg-center">
+                    {% if request.user.is_authenticated %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'sales:main_dashboard' %}">
+                                <i class="bi bi-speedometer2 me-1"></i> Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'sales:pos_screen' %}">
+                                <i class="bi bi-calculator me-1"></i> POS Terminal
+                            </a>
+                        </li>
+
+                        <!-- Role-Based Navigation Links -->
+                        {% if request.user.account_profile.role == 'LENDER' or request.user.is_staff or request.user.is_superuser %}
+                            <li class="nav-item">
+                                <a class="nav-link text-warning fw-semibold" href="{% url 'credit_scoring:lender_dashboard' %}">
+                                    <i class="bi bi-bank me-1"></i> Lender Portal
+                                </a>
+                            </li>
+                        {% else %}
+                            <li class="nav-item">
+                                <a class="nav-link text-info fw-semibold" href="{% url 'credit_scoring:merchant_dashboard' %}">
+                                    <i class="bi bi-graph-up-arrow me-1"></i> Credit Score
+                                </a>
+                            </li>
+                        {% endif %}
+
+                        <li class="nav-item ms-lg-2">
+                            <span class="badge bg-secondary px-3 py-2">
+                                <i class="bi bi-person-circle me-1"></i> {{ request.user.username }}
+                            </span>
+                        </li>
+                    {% else %}
+                        <li class="nav-item">
+                            <a class="btn btn-outline-primary btn-sm" href="{% url 'accounts:login' %}">Login</a>
+                        </li>
+                    {% endif %}
                 </ul>
             </div>
         </div>
     </nav>
 
     <main>
+        <!-- Display Django Flash Messages -->
+        {% if messages %}
+        <div class="container mb-3">
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
         {% block content %}
         {% endblock %}
     </main>

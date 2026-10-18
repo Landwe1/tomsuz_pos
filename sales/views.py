@@ -137,7 +137,6 @@ def main_dashboard(request):
         return render(request, 'sales/store_choice.html')
 
     # --- TIME ZONE LOCALIZATION CORRECTION ---
-    # timezone.localdate() evaluates date bounds contextually matching 'Africa/Lusaka'
     today = timezone.localdate()
     now_local = timezone.localtime()
     
@@ -146,15 +145,14 @@ def main_dashboard(request):
     # 1. Revenue Calculations
     today_total = store_sales.filter(timestamp__date=today).aggregate(
         Sum('total_amount')
-    )['total_amount__sum'] or 0
+    )['total_amount__sum'] or Decimal('0.00')
 
-    # Evaluates matching active localized calendar months
     month_total = store_sales.filter(
         timestamp__month=now_local.month,
         timestamp__year=now_local.year
-    ).aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+    ).aggregate(Sum('total_amount'))['total_amount__sum'] or Decimal('0.00')
 
-    # 2. Profit Calculation (Optimized using prefetch_related)
+    # 2. Profit Calculation
     today_sales = store_sales.filter(timestamp__date=today).prefetch_related('items__product')
     today_profit = sum(sale.get_total_profit() for sale in today_sales)
 
@@ -167,7 +165,7 @@ def main_dashboard(request):
     # 4. Total Stock Value Calculation
     total_inventory_value = Product.objects.filter(store=user_store).aggregate(
         total=Sum(F('stock_quantity') * F('selling_price'))
-    )['total'] or 0
+    )['total'] or Decimal('0.00')
 
     # 5. 7-Day Sales Trend Logic
     start_date = today - timedelta(days=6)
@@ -175,16 +173,41 @@ def main_dashboard(request):
         timestamp__date__range=[start_date, today]
     ).values('timestamp__date').annotate(total=Sum('total_amount')).order_by('timestamp__date')
 
-    # Map database results to the last 7 days (filling gaps with 0)
     sales_dict = {s['timestamp__date']: s['total'] for s in daily_sales}
-    chart_data = [float(sales_dict.get(start_date + timedelta(days=i), 0)) for i in range(7)]
+    chart_data = [float(sales_dict.get(start_date + timedelta(days=i), Decimal('0.00'))) for i in range(7)]
     chart_labels = [(start_date + timedelta(days=i)).strftime('%a') for i in range(7)]
 
-    # 6. Inventory and Staff
+    # --- NEW: 6. Most Sold & Least Sold Analytics ---
+    from django.db.models.functions import Coalesce
+    from django.db.models import Q
+
+    # Top 5 best selling items based on total quantity sold
+    most_sold_items = SaleItem.objects.filter(
+        sale__store=user_store,
+        product__is_active=True
+    ).values(
+        'product__name', 'product__unit_type'
+    ).annotate(
+        total_sold=Sum('quantity')
+    ).order_by('-total_sold')[:5]
+
+    # Bottom 5 slow-moving or dead-stock items (handles 0 sales automatically)
+    least_sold_items = Product.objects.filter(
+        store=user_store,
+        is_active=True
+    ).annotate(
+        total_sold=Coalesce(Sum('saleitem__quantity', filter=Q(saleitem__sale__store=user_store)), Decimal('0.00'))
+    ).order_by('total_sold', 'name')[:5]
+    # -----------------------------------------------
+
+    # 7. Inventory and Staff
     inventory = Product.objects.filter(store=user_store).order_by('stock_quantity')
     staff = User.objects.filter(
         profile__store=user_store
     ).exclude(id=request.user.id).select_related('profile')
+
+    # Store credit score placeholder/integration
+    store_credit_score = getattr(user_store, 'credit_score', 680)
 
     return render(request, 'sales/dashboard.html', {
         'store': user_store,
@@ -195,9 +218,12 @@ def main_dashboard(request):
         'total_inventory_value': total_inventory_value,
         'chart_data': chart_data,
         'chart_labels': chart_labels,
-        'today_date': today.strftime('%d %b %Y'), # Will show 13 Jun 2026 correctly now!
+        'today_date': today.strftime('%d %b %Y'),
         'inventory': inventory,
         'staff_members': staff,
+        'store_credit_score': store_credit_score,
+        'most_sold_items': most_sold_items,   # <-- Passed to template
+        'least_sold_items': least_sold_items, # <-- Passed to template
     })
 
 
@@ -226,38 +252,43 @@ def manage_inventory(request):
             try:
                 added_qty = Decimal(str(added_qty_raw))
                 product.stock_quantity += added_qty
+                product.save(update_fields=['stock_quantity'])
                 messages.success(request, f"Added {added_qty} units to {product.name}")
             except Exception:
                 messages.error(request, "Invalid stock quantity entered.")
 
         elif action == "edit":
-            stock = request.POST.get('stock') or '0'
-            b_price = request.POST.get('buying_price') or '0'
-            s_price = request.POST.get('price') or '0'
-            m_price = request.POST.get('min_price') or '0'
+            stock = request.POST.get('stock')
+            b_price = request.POST.get('buying_price')
+            s_price = request.POST.get('price')
+            m_price = request.POST.get('min_price')
+            threshold = request.POST.get('low_stock_threshold')
 
             try:
-                new_stock = Decimal(str(stock))
-                new_buying = Decimal(str(b_price))
-                new_selling = Decimal(str(s_price))
-                new_min = Decimal(str(m_price))
+                # Only update fields if they were provided in the POST request
+                if stock is not None and stock != '':
+                    product.stock_quantity = Decimal(str(stock))
+                if b_price is not None and b_price != '':
+                    product.buying_price = Decimal(str(b_price))
+                if s_price is not None and s_price != '':
+                    product.selling_price = Decimal(str(s_price))
+                if m_price is not None and m_price != '':
+                    product.min_price = Decimal(str(m_price))
+                if threshold is not None and threshold != '':
+                    product.low_stock_threshold = Decimal(str(threshold))
 
-                if new_min > new_selling:
+                if product.min_price > product.selling_price:
                     messages.warning(request, f"Warning: Min price for {product.name} is higher than selling price.")
 
-                product.stock_quantity = new_stock
-                product.buying_price = new_buying
-                product.selling_price = new_selling
-                product.min_price = new_min
-                
+                product.save()
                 messages.success(request, f"Updated {product.name} details successfully.")
             except Exception as e:
                 messages.error(request, f"Error updating {product.name}: Check your price formats.")
 
-        product.save()
         return redirect('sales:manage_inventory')
 
-    products = Product.objects.filter(store=profile.store).order_by('name')
+    # Fetch active products for the store
+    products = Product.objects.filter(store=profile.store, is_active=True).order_by('name')
     return render(request, 'sales/manage_inventory.html', {'products': products})
 
 
@@ -416,3 +447,69 @@ def delete_sale(request, sale_id):
 
     return redirect('sales:sales_history')
 
+from django.shortcuts import render
+# Import your credit score logic or model here
+
+def dashboard_view(request):
+    store = request.user.profile.store  # Adjust based on your store relationship
+    
+    # Calculate or retrieve credit score for this store
+    # Example: score = calculate_merchant_credit_score(store)
+    store_credit_score = getattr(store, 'credit_score', 680) # Replace with actual score or calculation
+
+    context = {
+        'store': store,
+        'today_total': 0.00,  # Your sales metrics
+        'today_profit': 0.00,
+        'total_inventory_value': 0.00,
+        'low_stock_count': 0,
+        'store_credit_score': store_credit_score,  # <-- Pass credit score here
+        # ... other context variables
+    }
+    return render(request, 'sales/dashboard.html', context)
+
+@login_required
+def business_insights(request):
+    profile = request.user.profile
+    if profile.role != 'OWNER':
+        return redirect('sales:pos_screen')
+
+    user_store = profile.store
+    store_sales = Sale.objects.filter(store=user_store)
+
+    today = timezone.localdate()
+    now_local = timezone.localtime()
+
+    # Metrics
+    today_total = store_sales.filter(timestamp__date=today).aggregate(Sum('total_amount'))['total_amount__sum'] or Decimal('0.00')
+    
+    # Week total (last 7 days)
+    week_start = today - timedelta(days=6)
+    week_total = store_sales.filter(timestamp__date__range=[week_start, today]).aggregate(Sum('total_amount'))['total_amount__sum'] or Decimal('0.00')
+
+    # Month total
+    month_total = store_sales.filter(timestamp__month=now_local.month, timestamp__year=now_local.year).aggregate(Sum('total_amount'))['total_amount__sum'] or Decimal('0.00')
+
+    # Year total
+    year_total = store_sales.filter(timestamp__year=now_local.year).aggregate(Sum('total_amount'))['total_amount__sum'] or Decimal('0.00')
+
+    # 5-Year Growth Trend Breakdown
+    from django.db.models.functions import ExtractYear
+    yearly_breakdown = list(
+        store_sales.annotate(sale_year=ExtractYear('timestamp'))
+        .values('sale_year')
+        .annotate(total=Sum('total_amount'))
+        .order_by('-sale_year')[:5]
+    )
+
+    # Format for template consistency
+    formatted_yearly = [{'year': item['sale_year'], 'total': float(item['total'] or 0)} for item in yearly_breakdown if item['sale_year']]
+
+    context = {
+        'today_total': today_total,
+        'week_total': week_total,
+        'month_total': month_total,
+        'year_total': year_total,
+        'yearly_breakdown': formatted_yearly,
+    }
+    return render(request, 'sales/report.html', context)

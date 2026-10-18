@@ -1,8 +1,8 @@
-from django.db import models
+from decimal import Decimal
+from django.db import models, transaction
 from django.conf import settings
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
-from django.db import transaction
 from products.models import Product
 
 
@@ -19,18 +19,27 @@ class Store(models.Model):
 
 
 class Profile(models.Model):
-    USER_ROLES = [('OWNER', 'Shop Owner'), ('CASHIER', 'Cashier')]
+    USER_ROLES = [
+        ('OWNER', 'Shop Owner'),
+        ('CASHIER', 'Cashier'),
+        ('LENDER', 'Lender / Loan Officer'),  # <--- Added
+        ('ADMIN', 'System Administrator'),    # <--- Added
+    ]
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='profile')
     store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name='staff', null=True, blank=True)
     role = models.CharField(max_length=10, choices=USER_ROLES, default='CASHIER')
 
     def __str__(self):
-        return f"{self.user.username} ({self.role}) - {self.store.name if self.store else 'No Store'}"
+        store_name = self.store.name if self.store else 'No Store'
+        return f"{self.user.username} ({self.get_role_display()}) - {store_name}"
 
     @property
     def is_owner(self):
         return self.role == 'OWNER'
 
+    @property
+    def is_lender(self):
+        return self.role == 'LENDER' or self.user.is_staff
 
 class Sale(models.Model):
     PAYMENT_METHODS = [
@@ -41,9 +50,9 @@ class Sale(models.Model):
     store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name='sales', null=True, blank=True)
     cashier = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     timestamp = models.DateTimeField(auto_now_add=True)
-    total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    amount_paid = models.DecimalField(max_digits=10, decimal_places=2)
-    change_due = models.DecimalField(max_digits=10, decimal_places=2)
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    change_due = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHODS, default='CASH')
     is_synced = models.BooleanField(default=True)
     offline_id = models.CharField(max_length=100, blank=True, null=True)
@@ -56,13 +65,17 @@ class Sale(models.Model):
         return f"Sale #{self.id} - {store_name} - K{self.total_amount}"
 
     def update_total_amount(self):
-        """Recalculates the master aggregate checkout price from row entries."""
+        """Recalculates the master aggregate checkout price from line items."""
         aggregate = self.items.aggregate(total=models.Sum('subtotal'))
-        self.total_amount = aggregate['total'] or 0.00
-        # Automatically adjust change due if payment parameters are explicitly filled
+        self.total_amount = aggregate['total'] or Decimal('0.00')
+        
         if self.amount_paid:
-            self.change_due = self.amount_paid - self.total_amount
-        self.save(update_fields=['total_amount', 'change_due'])
+            self.change_due = max(Decimal('0.00'), self.amount_paid - self.total_amount)
+            
+        Sale.objects.filter(pk=self.pk).update(
+            total_amount=self.total_amount,
+            change_due=self.change_due
+        )
 
     def get_total_profit(self):
         return sum(item.profit for item in self.items.all())
@@ -71,7 +84,7 @@ class Sale(models.Model):
 class SaleItem(models.Model):
     sale = models.ForeignKey(Sale, related_name='items', on_delete=models.CASCADE)
     product = models.ForeignKey(Product, on_delete=models.PROTECT)
-    quantity = models.DecimalField(max_digits=10, decimal_places=2, default=1.00)
+    quantity = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('1.00'))
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     cost_price = models.DecimalField(max_digits=10, decimal_places=2, editable=False)
     min_price_allowed = models.DecimalField(max_digits=10, decimal_places=2, editable=False)
@@ -82,56 +95,59 @@ class SaleItem(models.Model):
         return self.subtotal - (self.cost_price * self.quantity)
 
     def save(self, *args, **kwargs):
-        # 1. Financial Guardrails
+        # 1. Price Guardrails
         if self.unit_price < self.product.min_price:
-            raise ValueError(f"Price cannot be lower than K{self.product.min_price}")
+            raise ValueError(f"Price (K{self.unit_price}) cannot be lower than minimum allowed (K{self.product.min_price}).")
 
         self.subtotal = self.unit_price * self.quantity
 
-        # 2. Prevent concurrent race conditions using atomic transaction locks
+        # 2. Atomic Stock Adjustment
         with transaction.atomic():
-            # Refresh product stock directly from database with row lock
             product = Product.objects.select_for_update().get(pk=self.product_id)
 
             if not self.pk:
-                # Flow A: Fresh New Sale
                 self.cost_price = product.buying_price
                 self.min_price_allowed = product.min_price
                 stock_delta = self.quantity
             else:
-                # Flow B: Handling Updated Sale Items (e.g., changing quantity from 2 to 5)
-                original = SaleItem.objects.get(pk=self.pk)
-                stock_delta = self.quantity - original.quantity
+                original_qty = SaleItem.objects.values_list('quantity', flat=True).get(pk=self.pk)
+                stock_delta = self.quantity - original_qty
 
-            # Verify stock bounds against the relative delta change
-            if product.stock_quantity >= stock_delta:
-                product.stock_quantity -= stock_delta
-                product.save(update_fields=['stock_quantity'])
-                self.product = product  # Synchronize model memory reference
-            else:
-                raise ValueError(f"Not enough stock available for {product.name}. Requested adjustment: {stock_delta}, Available: {product.stock_quantity}")
+            if product.stock_quantity < stock_delta:
+                raise ValueError(
+                    f"Insufficient stock for {product.name}. "
+                    f"Requested adjustment: {stock_delta}, Available: {product.stock_quantity}"
+                )
 
+            product.stock_quantity -= stock_delta
+            product.save(update_fields=['stock_quantity'])
+            
             super().save(*args, **kwargs)
 
+    def delete(self, *args, **kwargs):
+        """Restores product stock when line item is deleted."""
+        with transaction.atomic():
+            product = Product.objects.select_for_update().get(pk=self.product_id)
+            product.stock_quantity += self.quantity
+            product.save(update_fields=['stock_quantity'])
+            super().delete(*args, **kwargs)
 
-# --- REFINED AUTOMATION SIGNALS & LIFECYCLE HOOKS ---
+
+# --- SIGNALS ---
 
 @receiver(post_save, sender=SaleItem)
 @receiver(post_delete, sender=SaleItem)
 def update_sale_financial_summary(sender, instance, **kwargs):
-    """Triggers total calculation updates on parent sale whenever line items change."""
-    if instance.sale:
+    """Updates total calculation on parent sale without triggering recursive signals."""
+    if instance.sale_id:
         instance.sale.update_total_amount()
 
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
-def create_user_profile(sender, instance, created, **kwargs):
+def create_or_save_user_profile(sender, instance, created, **kwargs):
     if created:
-        Profile.objects.get_or_create(user=instance)
-
-
-@receiver(post_save, sender=settings.AUTH_USER_MODEL)
-def save_user_profile(sender, instance, **kwargs):
-    if hasattr(instance, 'profile'):
-        instance.profile.save()
+        Profile.objects.create(user=instance)
+    else:
+        if hasattr(instance, 'profile'):
+            instance.profile.save()
 

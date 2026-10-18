@@ -3,76 +3,115 @@
 {% block content %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<div class="container-fluid py-4" style="background-color: #f8f9fa; min-height: 100vh;">
+<div class="container-fluid py-4 bg-light min-vh-100">
     <div class="container">
 
-        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4">
+        <!-- Top Header & Action Buttons -->
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
             <div>
-                <div class="d-flex align-items-center">
-                    <h1 class="h3 mb-0 text-gray-800 fw-bold">{{ store.name|default:"TomSuz" }} Dashboard</h1>
-                    <span class="badge bg-dark ms-3 shadow-sm" style="font-family: 'Courier New', monospace;">
-                        ID: #{{ store.id }}
-                    </span>
+                <div class="d-flex align-items-center gap-2">
+                    <h1 class="h3 mb-0 text-dark fw-bold">{{ store.name|default:"TomSuz" }} Dashboard</h1>
+                    <span class="badge bg-dark shadow-sm font-monospace">ID: #{{ store.id }}</span>
                 </div>
-                <p class="text-muted mb-0">Operator: {{ request.user.username }} | {{ today_date }}</p>
+                <p class="text-muted small mb-0 mt-1">
+                    <i class="bi bi-person me-1"></i>Operator: <strong>{{ request.user.username }}</strong> 
+                    <span class="mx-1">•</span> 
+                    <i class="bi bi-calendar3 me-1"></i>{{ today_date }}
+                </p>
             </div>
 
-            <div class="mt-3 mt-md-0">
-                <a href="{% url 'sales:sales_history' %}" class="btn btn-outline-dark shadow-sm px-3 py-2 fw-bold me-2">
-                    <i class="bi bi-clock-history me-2"></i>HISTORY
+            <div class="d-flex flex-wrap gap-2">
+                <!-- Business Insights Button Added Here -->
+                <a href="{% url 'sales:business_insights' %}" class="btn btn-outline-info shadow-sm fw-semibold">
+                    <i class="bi bi-bar-chart-line me-1"></i> Insights
                 </a>
-                <a href="{% url 'sales:manage_inventory' %}" class="btn btn-outline-primary shadow-sm px-3 py-2 fw-bold me-2">
-                    <i class="bi bi-boxes me-2"></i>INVENTORY
+                <a href="{% url 'sales:sales_history' %}" class="btn btn-outline-dark shadow-sm fw-semibold">
+                    <i class="bi bi-clock-history me-1"></i> History
                 </a>
-                <a href="{% url 'sales:pos_screen' %}" class="btn btn-primary shadow px-4 py-2 fw-bold">
-                    <i class="bi bi-calculator me-2"></i>OPEN POS TERMINAL
+                <a href="{% url 'sales:manage_inventory' %}" class="btn btn-outline-primary shadow-sm fw-semibold">
+                    <i class="bi bi-boxes me-1"></i> Bulk Inventory
+                </a>
+                <a href="{% url 'sales:pos_screen' %}" class="btn btn-primary shadow-sm fw-semibold">
+                    <i class="bi bi-calculator me-1"></i> Open POS Terminal
                 </a>
             </div>
         </div>
 
-        <div class="row mb-4">
-            <div class="col-xl-3 col-md-6 mb-4">
-                <div class="card border-0 shadow-sm h-100 py-2 border-start border-primary border-4">
+        <!-- Metric KPI Cards -->
+        <div class="row g-3 mb-4">
+            <div class="col-xl col-md-4 col-sm-6">
+                <div class="card border-0 shadow-sm h-100 border-start border-primary border-4">
                     <div class="card-body">
-                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Total Revenue (Today)</div>
-                        <div class="h4 mb-0 font-weight-bold text-gray-800">K{{ today_total|floatformat:2|default:"0.00" }}</div>
+                        <div class="text-uppercase text-primary fw-bold small mb-1">Total Revenue (Today)</div>
+                        <div class="h3 mb-0 fw-bold text-dark">K{{ today_total|floatformat:2|default:"0.00" }}</div>
                     </div>
                 </div>
             </div>
 
-            <div class="col-xl-3 col-md-6 mb-4">
-                <div class="card border-0 shadow-sm h-100 py-2 border-start border-success border-4">
+            <div class="col-xl col-md-4 col-sm-6">
+                <div class="card border-0 shadow-sm h-100 border-start border-success border-4">
                     <div class="card-body">
-                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Estimated Profit (Today)</div>
-                        <div class="h4 mb-0 font-weight-bold text-gray-800">K{{ today_profit|floatformat:2|default:"0.00" }}</div>
+                        <div class="text-uppercase text-success fw-bold small mb-1">Estimated Profit (Today)</div>
+                        <div class="h3 mb-0 fw-bold text-dark">K{{ today_profit|floatformat:2|default:"0.00" }}</div>
                     </div>
                 </div>
             </div>
 
-            <div class="col-xl-3 col-md-6 mb-4">
-                <div class="card border-0 shadow-sm h-100 py-2 border-start border-info border-4">
+            <!-- Merchant Credit Score Card -->
+            <div class="col-xl col-md-4 col-sm-6">
+                <div class="card border-0 shadow-sm h-100 border-start border-4" style="border-left-color: #6f42c1 !important;">
                     <div class="card-body">
-                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Total Stock Value</div>
-                        <div class="h4 mb-0 font-weight-bold text-gray-800">K{{ total_inventory_value|floatformat:2|default:"0.00" }}</div>
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <div class="text-uppercase fw-bold small" style="color: #6f42c1;">Credit Score</div>
+                            <button type="button" class="btn btn-link p-0 text-decoration-none small text-muted" data-bs-toggle="modal" data-bs-target="#creditScoreModal">
+                                <i class="bi bi-info-circle me-1"></i>Report
+                            </button>
+                        </div>
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div class="h3 mb-0 fw-bold text-dark">
+                                {{ store_credit_score|default:"N/A" }}
+                            </div>
+                            {% if store_credit_score %}
+                                {% if store_credit_score >= 700 %}
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle">Prime</span>
+                                {% elif store_credit_score >= 550 %}
+                                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle">Moderate</span>
+                                {% else %}
+                                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle">High Risk</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Unscored</span>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="col-xl-3 col-md-6 mb-4">
-                <div class="card border-0 shadow-sm h-100 py-2 border-start border-warning border-4">
+            <div class="col-xl col-md-6 col-sm-6">
+                <div class="card border-0 shadow-sm h-100 border-start border-info border-4">
                     <div class="card-body">
-                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Low Stock Items</div>
-                        <div class="h4 mb-0 font-weight-bold text-gray-800">{{ low_stock_count|default:"0" }}</div>
+                        <div class="text-uppercase text-info fw-bold small mb-1">Total Stock Value</div>
+                        <div class="h3 mb-0 fw-bold text-dark">K{{ total_inventory_value|floatformat:2|default:"0.00" }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl col-md-6 col-sm-6">
+                <div class="card border-0 shadow-sm h-100 border-start border-warning border-4">
+                    <div class="card-body">
+                        <div class="text-uppercase text-warning fw-bold small mb-1">Low Stock Items</div>
+                        <div class="h3 mb-0 fw-bold text-dark">{{ low_stock_count|default:"0" }}</div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="row">
-            <div class="col-lg-8 mb-4">
+        <!-- Sales Trend & Staff Row -->
+        <div class="row g-4 mb-4">
+            <div class="col-lg-8">
                 <div class="card shadow-sm border-0 h-100">
-                    <div class="card-header bg-white py-3">
-                        <h6 class="m-0 font-weight-bold text-primary">7-Day Sales Trend</h6>
+                    <div class="card-header bg-white py-3 border-bottom-0">
+                        <h6 class="m-0 fw-bold text-primary"><i class="bi bi-graph-up me-2"></i>7-Day Sales Trend</h6>
                     </div>
                     <div class="card-body">
                         <canvas id="salesChart" height="250"></canvas>
@@ -80,24 +119,35 @@
                 </div>
             </div>
 
-            <div class="col-lg-4 mb-4">
+            <div class="col-lg-4">
                 <div class="card shadow-sm border-0 h-100">
-                    <div class="card-header bg-white py-3 d-flex justify-content-between">
-                        <h6 class="m-0 font-weight-bold text-primary">Staff</h6>
-                        <a href="{% url 'sales:add_cashier' %}" class="btn btn-sm btn-outline-success"><i class="bi bi-plus"></i></a>
+                    <div class="card-header bg-white py-3 border-bottom-0 d-flex justify-content-between align-items-center">
+                        <h6 class="m-0 fw-bold text-primary"><i class="bi bi-people me-2"></i>Staff Members</h6>
+                        <a href="{% url 'sales:add_cashier' %}" class="btn btn-sm btn-outline-success rounded-circle" title="Add Staff">
+                            <i class="bi bi-plus-lg"></i>
+                        </a>
                     </div>
                     <div class="card-body p-0">
                         <ul class="list-group list-group-flush">
                             {% for staff in staff_members %}
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <li class="list-group-item d-flex justify-content-between align-items-center py-3 px-3">
                                 <div>
-                                    <span class="fw-bold">{{ staff.username }}</span><br>
+                                    <div class="fw-bold text-dark">{{ staff.username }}</div>
                                     <small class="text-muted">{{ staff.profile.role|title|default:"Staff" }}</small>
                                 </div>
-                                <span class="badge bg-{{ staff.is_active|yesno:'success,secondary' }} rounded-pill">●</span>
+                                <!-- Interactive Status Toggle Form -->
+                                <form method="POST" action="{% url 'sales:toggle_cashier_status' staff.id %}" class="mb-0">
+                                    {% csrf_token %}
+                                    <button type="submit" 
+                                            class="btn btn-sm rounded-pill px-3 py-1 fw-semibold {% if staff.is_active %}bg-success-subtle text-success border border-success-subtle{% else %}bg-secondary-subtle text-secondary border border-secondary-subtle{% endif %}"
+                                            title="Click to toggle account status">
+                                        <i class="bi {% if staff.is_active %}bi-check-circle-fill me-1{% else %}bi-dash-circle-fill me-1{% endif %}"></i>
+                                        {% if staff.is_active %}Active{% else %}Inactive{% endif %}
+                                    </button>
+                                </form>
                             </li>
                             {% empty %}
-                            <li class="list-group-item text-center py-3 text-muted">No staff members listed.</li>
+                            <li class="list-group-item text-center py-4 text-muted">No staff members listed.</li>
                             {% endfor %}
                         </ul>
                     </div>
@@ -105,117 +155,248 @@
             </div>
         </div>
 
-        <div class="row">
-            <div class="col-12 mb-4">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                        <h6 class="m-0 font-weight-bold text-primary">Current Inventory Stock</h6>
-                        <div>
-                            <a href="{% url 'sales:manage_inventory' %}" class="btn btn-sm btn-outline-primary me-2">
-                                <i class="bi bi-pencil-square me-1"></i> Bulk Manage
-                            </a>
-                            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addProductModal">
-                                <i class="bi bi-plus-circle me-1"></i> Add New Product
-                            </button>
-                        </div>
+        <!-- Most Sold & Least Sold Velocity Row + Quick Action Panel -->
+        <div class="row g-4 mb-4">
+            <!-- Top Selling Items -->
+            <div class="col-md-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white py-3 border-bottom-0">
+                        <h6 class="m-0 fw-bold text-success"><i class="bi bi-graph-up-arrow me-2"></i>Top Sellers</h6>
                     </div>
                     <div class="card-body p-0">
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle mb-0">
-                                <thead class="table-light text-muted small text-uppercase">
-                                    <tr>
-                                        <th class="ps-4">Product Name</th>
-                                        <th>Current Stock</th>
-                                        <th>Selling Price</th>
-                                        <th class="text-end pe-4">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for item in inventory %}
-                                    <tr>
-                                        <td class="ps-4 fw-bold text-dark">{{ item.name|truncatechars:25 }}</td>
-                                        <td>
-                                            {% if item.is_low_stock %}
-                                                <span class="badge bg-danger-subtle text-danger">Low: {{ item.stock_quantity|floatformat:0 }}</span>
-                                            {% else %}
-                                                <span class="text-dark">{{ item.stock_quantity|floatformat:0 }}</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>K{{ item.selling_price|floatformat:2 }}</td>
-                                        <td class="text-end pe-4">
-                                            <a href="{% url 'sales:manage_inventory' %}" class="btn btn-sm btn-light border"><i class="bi bi-pencil"></i></a>
-                                        </td>
-                                    </tr>
-                                    {% empty %}
-                                    <tr><td colspan="4" class="text-center py-5">No products found.</td></tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+                        <ul class="list-group list-group-flush">
+                            {% for item in most_sold_items %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center py-2 px-3">
+                                <span class="fw-semibold text-dark text-truncate" style="max-width: 180px;">{{ item.product__name }}</span>
+                                <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill">
+                                    {{ item.total_sold|floatformat:0 }} sold
+                                </span>
+                            </li>
+                            {% empty %}
+                            <li class="list-group-item text-center py-3 text-muted small">No sales recorded yet.</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slow-Moving / Dead Stock -->
+            <div class="col-md-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white py-3 border-bottom-0">
+                        <h6 class="m-0 fw-bold text-danger"><i class="bi bi-graph-down-arrow me-2"></i>Slow-Moving Stock</h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <ul class="list-group list-group-flush">
+                            {% for item in least_sold_items %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center py-2 px-3">
+                                <span class="fw-semibold text-dark text-truncate" style="max-width: 180px;">{{ item.name }}</span>
+                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill">
+                                    {{ item.total_sold|default:"0"|floatformat:0 }} sold
+                                </span>
+                            </li>
+                            {% empty %}
+                            <li class="list-group-item text-center py-3 text-muted small">No products found.</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Inventory Action Hub -->
+            <div class="col-md-4">
+                <div class="card shadow-sm border-0 h-100 bg-primary bg-gradient text-white">
+                    <div class="card-body d-flex flex-column justify-content-between p-4">
+                        <div>
+                            <h5 class="fw-bold mb-2"><i class="bi bi-boxes me-2"></i>Inventory Command</h5>
+                            <p class="small text-white-50 mb-3">Manage thousands of catalog items, edit prices, or inspect stock levels instantly.</p>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <!-- Trigger Button to Open Current Stock Modal -->
+                            <button type="button" class="btn btn-light fw-bold text-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#currentStockModal">
+                                <i class="bi bi-eye me-1"></i> Show Current Stock
+                            </button>
+                            <a href="{% url 'sales:manage_inventory' %}" class="btn btn-outline-light fw-semibold">
+                                <i class="bi bi-pencil-square me-1"></i> Bulk Edit / Restock
+                            </a>
+                            <button type="button" class="btn btn-success fw-semibold" data-bs-toggle="modal" data-bs-target="#addProductModal">
+                                <i class="bi bi-plus-circle me-1"></i> Add New Product
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+
     </div>
 </div>
 
-<div class="modal fade" id="addProductModal" tabindex="-1">
+<!-- ================= MODALS ================= -->
+
+<!-- Current Stock Inspection Modal (Supermarket Friendly) -->
+<div class="modal fade" id="currentStockModal" tabindex="-1" aria-labelledby="currentStockModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title fw-bold" id="currentStockModalLabel">
+                    <i class="bi bi-box-seam me-2 text-primary"></i>Store Inventory Catalog
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="p-3 bg-light border-bottom">
+                    <input type="text" id="stockSearchInput" class="form-control form-control-sm" placeholder="Search product name or barcode...">
+                </div>
+                <div class="table-responsive" style="max-height: 400px;">
+                    <table class="table table-hover align-middle mb-0" id="stockTable">
+                        <thead class="table-light text-muted small text-uppercase sticky-top">
+                            <tr>
+                                <th class="ps-3">Product Name</th>
+                                <th>Stock Qty</th>
+                                <th>Selling Price</th>
+                                <th class="text-end pe-3">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in inventory %}
+                            <tr>
+                                <td class="ps-3 fw-bold text-dark">{{ item.name }}</td>
+                                <td>
+                                    {% if item.is_low_stock %}
+                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle">
+                                            Low: {{ item.stock_quantity|floatformat:0 }}
+                                        </span>
+                                    {% else %}
+                                        <span class="text-dark fw-semibold">{{ item.stock_quantity|floatformat:0 }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="fw-semibold">K{{ item.selling_price|floatformat:2 }}</td>
+                                <td class="text-end pe-3">
+                                    <a href="{% url 'sales:manage_inventory' %}" class="btn btn-sm btn-outline-primary py-0 px-2">Edit</a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center py-4 text-muted">No products found in inventory.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <a href="{% url 'sales:manage_inventory' %}" class="btn btn-primary btn-sm fw-semibold">Open Full Inventory Manager</a>
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Product Modal -->
+<div class="modal fade" id="addProductModal" tabindex="-1" aria-labelledby="addProductModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title">Add Product to Inventory</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title fw-bold" id="addProductModalLabel">Add Product to Inventory</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form action="{% url 'sales:add_product' %}" method="POST">
                 {% csrf_token %}
-                <div class="modal-body">
+                <div class="modal-body p-4">
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Product Name</label>
+                        <label class="form-label fw-semibold">Product Name</label>
                         <input type="text" name="name" class="form-control" placeholder="e.g. 500ml Bottled Water" required>
                     </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label fw-bold">Buying Price (K)</label>
-                            <input type="number" step="0.01" name="buying_price" class="form-control" placeholder="0.00" required>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Buying Price (K)</label>
+                            <input type="number" step="0.01" min="0" name="buying_price" class="form-control" placeholder="0.00" required>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label fw-bold">Selling Price (K)</label>
-                            <input type="number" step="0.01" name="selling_price" class="form-control" placeholder="0.00" required>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Selling Price (K)</label>
+                            <input type="number" step="0.01" min="0" name="selling_price" class="form-control" placeholder="0.00" required>
                         </div>
                     </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label fw-bold">Min Selling Price (K)</label>
-                            <input type="number" step="0.01" name="min_price" class="form-control" placeholder="0.00" required>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Min Selling Price (K)</label>
+                            <input type="number" step="0.01" min="0" name="min_price" class="form-control" placeholder="0.00" required>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label fw-bold">Initial Stock</label>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Initial Stock</label>
                             <input type="number" step="0.01" name="stock_quantity" class="form-control" value="0" required>
                         </div>
                     </div>
-                    <div class="row">
-                        <div class="col-12 mb-3">
-                            <label class="form-label fw-bold text-warning">Low Stock Warning Threshold</label>
-                            <input type="number" step="0.01" name="low_stock_threshold" class="form-control" value="5.00" required>
-                            <div class="form-text text-muted small">Triggers alert state when item count reaches or drops below this value.</div>
-                        </div>
+
+                    <div>
+                        <label class="form-label fw-semibold text-warning-emphasis">Low Stock Warning Threshold</label>
+                        <input type="number" step="0.01" name="low_stock_threshold" class="form-control" value="5.00" required>
+                        <div class="form-text text-muted">Triggers alert state when item count reaches or drops below this value.</div>
                     </div>
                 </div>
-                <div class="modal-footer bg-light">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary px-4">Save Product</button>
+
+                <div class="modal-footer bg-light px-4 py-3">
+                    <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4 fw-semibold">Save Product</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
+<!-- Merchant Credit Score Details Modal -->
+<div class="modal fade" id="creditScoreModal" tabindex="-1" aria-labelledby="creditScoreModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header text-white" style="background-color: #6f42c1;">
+                <h5 class="modal-title fw-bold" id="creditScoreModalLabel">Merchant Credit Assessment</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="text-center mb-4">
+                    <div class="display-4 fw-bold text-dark">{{ store_credit_score|default:"N/A" }}</div>
+                    <small class="text-muted">Calculated Credit Score (300 – 850)</small>
+                </div>
+                <div class="list-group list-group-flush border-top border-bottom mb-3">
+                    <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-0">
+                        <span class="text-muted small">Sales Consistency</span>
+                        <span class="fw-semibold text-dark">{{ credit_metrics.sales_consistency|default:"Good" }}</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-0">
+                        <span class="text-muted small">Monthly Revenue Turnover</span>
+                        <span class="fw-semibold text-dark">K{{ month_total|floatformat:2|default:"0.00" }}</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-0">
+                        <span class="text-muted small">Inventory Valuation</span>
+                        <span class="fw-semibold text-dark">K{{ total_inventory_value|floatformat:2|default:"0.00" }}</span>
+                    </div>
+                </div>
+                <div class="alert alert-info py-2 small mb-0">
+                    <i class="bi bi-shield-check me-1"></i> This score is generated automatically using verified POS transaction logs and stock levels.
+                </div>
+            </div>
+            <div class="modal-footer bg-light px-4 py-3">
+                <button type="button" class="btn btn-secondary px-4 fw-semibold" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart Script & Table Filter Script -->
+{{ chart_labels|json_script:"chart-labels-data" }}
+{{ chart_data|json_script:"chart-sales-data" }}
+
 <script>
     document.addEventListener("DOMContentLoaded", function() {
+        // Sales Trend Chart
         const ctx = document.getElementById('salesChart').getContext('2d');
-        
-        const labelsData = {% if chart_labels %}{{ chart_labels|safe }}{% else %}['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']{% endif %};
-        const salesData = {% if chart_data %}{{ chart_data|safe }}{% else %}[0, 0, 0, 0, 0, 0, 0]{% endif %};
+        const labelsElement = document.getElementById('chart-labels-data');
+        const salesElement = document.getElementById('chart-sales-data');
+
+        const labelsData = labelsElement ? JSON.parse(labelsElement.textContent) : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const salesData = salesElement ? JSON.parse(salesElement.textContent) : [0, 0, 0, 0, 0, 0, 0];
 
         new Chart(ctx, {
             type: 'line',
@@ -224,18 +405,41 @@
                 datasets: [{
                     label: 'Daily Sales (K)',
                     data: salesData,
-                    borderColor: '#0056b3',
-                    backgroundColor: 'rgba(0, 86, 179, 0.1)',
+                    borderColor: '#0d6efd',
+                    backgroundColor: 'rgba(13, 110, 253, 0.08)',
                     fill: true,
-                    tension: 0.3
+                    tension: 0.35,
+                    borderWidth: 2,
+                    pointBackgroundColor: '#0d6efd'
                 }]
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
                 plugins: { legend: { display: false } },
-                scales: { y: { beginAtZero: true } }
+                scales: { 
+                    y: { 
+                        beginAtZero: true,
+                        ticks: {
+                            callback: value => 'K' + value
+                        }
+                    } 
+                }
             }
         });
+
+        // Quick Search Filter for Stock Modal
+        const searchInput = document.getElementById('stockSearchInput');
+        if (searchInput) {
+            searchInput.addEventListener('keyup', function() {
+                const filter = searchInput.value.toLowerCase();
+                const rows = document.querySelectorAll('#stockTable tbody tr');
+                rows.forEach(row => {
+                    const text = row.textContent.toLowerCase();
+                    row.style.display = text.includes(filter) ? '' : 'none';
+                });
+            });
+        }
     });
 </script>
 {% endblock %}

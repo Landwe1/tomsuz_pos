@@ -3,125 +3,149 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TomSuz POS - Inventory</title>
+    <title>Inventory Management</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <style>
-        .product-card { border-left: 5px solid #0056b3; margin-bottom: 15px; }
+        .product-card { border-left: 5px solid #0d6efd; margin-bottom: 15px; border-radius: 0.5rem; transition: transform 0.2s; }
+        .product-card:hover { transform: translateY(-2px); }
         .low-stock { border-left: 5px solid #dc3545; background-color: #fff5f5; }
         .btn-add { border-radius: 50px; font-weight: bold; }
-        .badge-stock { font-size: 0.9em; }
+        .badge-stock { font-size: 0.85em; }
     </style>
 </head>
 <body class="bg-light">
 
-<div class="container py-3">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2 class="mb-0">Inventory</h2>
-        <button type="button" class="btn btn-success btn-add shadow-sm" data-bs-toggle="modal" data-bs-target="#addProductModal">
-            + Add Product
+<div class="container py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-0 text-dark"><i class="bi bi-box-seam me-2 text-primary"></i>Inventory Management</h2>
+            <p class="text-muted small mb-0">Manage your store products, stock levels, and barcodes</p>
+        </div>
+        <button type="button" class="btn btn-success btn-add shadow-sm px-4 py-2" data-bs-toggle="modal" data-bs-target="#addProductModal">
+            <i class="bi bi-plus-lg me-1"></i> Add Product
         </button>
     </div>
 
+    <!-- Search and Filter Row -->
     <div class="row g-2 mb-4">
-        <div class="col-8">
+        <div class="col-md-8">
             <form method="GET" action="{% url 'product_list' %}">
                 <div class="input-group shadow-sm">
-                    <input type="text" name="q" class="form-control" placeholder="Search..." value="{{ query|default:'' }}">
-                    <button class="btn btn-primary" type="submit">Search</button>
+                    <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" name="q" class="form-control border-start-0 ps-0" placeholder="Search by product name or barcode..." value="{{ query|default:'' }}">
+                    <button class="btn btn-primary px-4" type="submit">Search</button>
                 </div>
             </form>
         </div>
-        <div class="col-4">
+        <div class="col-md-4">
             {% if low_stock_mode %}
-                <a href="{% url 'product_list' %}" class="btn btn-outline-secondary w-100 shadow-sm">Show All</a>
+                <a href="{% url 'product_list' %}" class="btn btn-outline-secondary w-100 shadow-sm py-2">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i> Show All Products
+                </a>
             {% else %}
-                <a href="?low_stock=1" class="btn btn-outline-danger w-100 shadow-sm">Low Stock</a>
-            {%   endif %}
+                <a href="?low_stock=1" class="btn btn-outline-danger w-100 shadow-sm py-2">
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i> View Low Stock Alert
+                </a>
+            {% endif %}
         </div>
     </div>
 
+    <!-- Product List -->
     <div class="list-group">
         {% for product in products %}
-        <div class="list-group-item product-card shadow-sm {% if product.stock_quantity <= 5 %}low-stock{% endif %}">
-            <div class="d-flex w-100 justify-content-between">
-                <h5 class="mb-1 text-primary">{{ product.name }}</h5>
-                <span class="badge bg-secondary badge-stock">K{{ product.selling_price }}</span>
+        <div class="list-group-item product-card shadow-sm p-3 {% if product.stock_quantity <= product.low_stock_threshold %}low-stock{% endif %}">
+            <div class="d-flex w-100 justify-content-between align-items-center">
+                <h5 class="mb-1 fw-bold text-dark">{{ product.name }}</h5>
+                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-3 py-2 rounded-pill fw-bold">
+                    Selling: K{{ product.selling_price }}
+                </span>
             </div>
             
-            <p class="mb-1 text-muted">
-                <strong>Stock:</strong> {{ product.stock_quantity }} {{ product.get_unit_type_display }}<br>
-                <small>Barcode: {{ product.barcode|default:"None" }}</small>
+            <p class="text-muted small mt-2 mb-2">
+                <span class="me-3"><strong>Stock:</strong> {{ product.stock_quantity }} {{ product.get_unit_type_display }}</span>
+                <span class="me-3"><strong>Cost Price:</strong> K{{ product.buying_price|default:"0.00" }}</span>
+                <span><strong>Barcode:</strong> {{ product.barcode|default:"None" }}</span>
             </p>
 
-            {% if product.stock_quantity <= 5 %}
-                <div class="text-danger mb-2 small font-weight-bold">⚠ Needs Restock!</div>
+            {% if product.stock_quantity <= product.low_stock_threshold %}
+                <div class="text-danger mb-2 small fw-bold">
+                    <i class="bi bi-exclamation-circle-fill me-1"></i> Needs Restock! (Threshold: {{ product.low_stock_threshold }})
+                </div>
             {% endif %}
 
-            <div class="d-flex gap-2">
-                <button class="btn btn-sm btn-outline-primary flex-grow-1" data-bs-toggle="modal" data-bs-target="#editModal{{ product.id }}">
-                    Edit
+            <div class="d-flex gap-2 mt-3">
+                <button class="btn btn-sm btn-outline-primary flex-grow-1 py-1.5 fw-semibold" data-bs-toggle="modal" data-bs-target="#editModal{{ product.id }}">
+                    <i class="bi bi-pencil-square me-1"></i> Edit
                 </button>
-                <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal{{ product.id }}">
-                    Delete
+                <button class="btn btn-sm btn-outline-danger py-1.5 fw-semibold" data-bs-toggle="modal" data-bs-target="#deleteModal{{ product.id }}">
+                    <i class="bi bi-trash me-1"></i> Delete
                 </button>
-                <button class="btn btn-sm btn-outline-dark" onclick="printLabel('{{ product.name }}', '{{ product.barcode|default:product.id }}', '{{ product.selling_price }}')">
-                 Print
+                <button class="btn btn-sm btn-outline-dark py-1.5 fw-semibold" onclick="printLabel('{{ product.name }}', '{{ product.barcode|default:product.id }}', '{{ product.selling_price }}')">
+                    <i class="bi bi-upc-scan me-1"></i> Print Label
                 </button>
             </div>
         </div>
 
+        <!-- Edit Modal -->
         <div class="modal fade" id="editModal{{ product.id }}" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Edit {{ product.name }}</h5>
+                <div class="modal-content border-0 shadow-lg rounded-4">
+                    <div class="modal-header border-0 pb-0">
+                        <h5 class="modal-title fw-bold">Edit Product: {{ product.name }}</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <form method="POST" action="{% url 'update_product' product.id %}">
                         {% csrf_token %}
                         <div class="modal-body text-start">
                             <div class="mb-3">
-                                <label class="form-label">Name</label>
+                                <label class="form-label small fw-bold text-muted">Product Name</label>
                                 <input type="text" name="name" class="form-control" value="{{ product.name }}" required>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label">Barcode</label>
+                                <label class="form-label small fw-bold text-muted">Barcode</label>
                                 <input type="text" name="barcode" class="form-control" value="{{ product.barcode|default:'' }}">
                             </div>
                             <div class="row">
                                 <div class="col-6 mb-3">
-                                    <label class="form-label">Price</label>
-                                    <input type="number" step="0.01" name="selling_price" class="form-control" value="{{ product.selling_price }}" required>
+                                    <label class="form-label small fw-bold text-muted">Buying Price (K)</label>
+                                    <input type="number" step="0.01" name="buying_price" class="form-control" value="{{ product.buying_price|default:'' }}">
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label class="form-label">Stock</label>
-                                    <input type="number" name="stock_quantity" class="form-control" value="{{ product.stock_quantity }}" required>
+                                    <label class="form-label small fw-bold text-muted">Selling Price (K)</label>
+                                    <input type="number" step="0.01" name="selling_price" class="form-control" value="{{ product.selling_price }}" required>
                                 </div>
                             </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold text-muted">Stock Quantity</label>
+                                <input type="number" step="0.01" name="stock_quantity" class="form-control" value="{{ product.stock_quantity }}" required>
+                            </div>
                         </div>
-                        <div class="modal-footer">
-                            <button type="submit" class="btn btn-primary w-100">Update Product</button>
+                        <div class="modal-footer border-0 pt-0">
+                            <button type="submit" class="btn btn-primary w-100 py-2 rounded-pill fw-bold">Save Changes</button>
                         </div>
                     </form>
                 </div>
             </div>
         </div>
 
+        <!-- Delete Modal -->
         <div class="modal fade" id="deleteModal{{ product.id }}" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
+                <div class="modal-content border-0 shadow-lg rounded-4">
                     <div class="modal-header bg-danger text-white border-0">
-                        <h5 class="modal-title">Confirm Delete</h5>
+                        <h5 class="modal-title fw-bold"><i class="bi bi-exclamation-triangle-fill me-2"></i>Confirm Deletion</h5>
                     </div>
                     <div class="modal-body text-center p-4">
-                        Are you sure you want to delete <strong>{{ product.name }}</strong>?<br>
-                        <small class="text-muted">This action is permanent.</small>
+                        <p class="mb-1">Are you sure you want to remove <strong>{{ product.name }}</strong>?</p>
+                        <small class="text-muted">This will hide it from your active inventory and POS screen while keeping historical receipts intact.</small>
                     </div>
-                    <div class="modal-footer border-0">
+                    <div class="modal-footer border-0 pb-4 px-4">
                         <form method="POST" action="{% url 'delete_product' product.id %}" class="w-100 d-flex gap-2">
                             {% csrf_token %}
-                            <button type="button" class="btn btn-secondary flex-grow-1" data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" class="btn btn-danger flex-grow-1">Yes, Delete</button>
+                            <button type="button" class="btn btn-secondary flex-grow-1 rounded-pill py-2" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-danger flex-grow-1 rounded-pill py-2">Yes, Remove</button>
                         </form>
                     </div>
                 </div>
@@ -129,56 +153,62 @@
         </div>
 
         {% empty %}
-        <div class="text-center mt-5 py-5 bg-white rounded shadow-sm">
-            <p class="text-muted">No products found. Start by adding one!</p>
+        <div class="text-center mt-5 py-5 bg-white rounded-4 shadow-sm">
+            <i class="bi bi-folder2-open display-4 text-muted mb-3 d-block"></i>
+            <h5 class="fw-bold text-dark">No products found</h5>
+            <p class="text-muted small">Start adding items to your store inventory to begin selling.</p>
         </div>
         {% endfor %}
     </div>
 </div>
 
+<!-- Add Product Modal -->
 <div class="modal fade" id="addProductModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Add New Product</h5>
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold"><i class="bi bi-plus-circle me-2 text-success"></i>Add New Product</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" action="{% url 'product_list' %}">
                 {% csrf_token %}
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">Product Name</label>
-                        <input type="text" name="name" class="form-control" required>
+                        <label class="form-label small fw-bold text-muted">Product Name</label>
+                        <input type="text" name="name" class="form-control" required placeholder="e.g. Cooking Oil 2L">
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Barcode</label>
-                        <input type="text" name="barcode" class="form-control">
+                        <label class="form-label small fw-bold text-muted">Barcode (Optional)</label>
+                        <input type="text" name="barcode" class="form-control" placeholder="Scan or type barcode">
                     </div>
                     <div class="row">
                         <div class="col-6 mb-3">
-                            <label class="form-label">Price (K)</label>
-                            <input type="number" step="0.01" name="selling_price" class="form-control" required>
+                            <label class="form-label small fw-bold text-muted">Buying Price (K)</label>
+                            <input type="number" step="0.01" name="buying_price" class="form-control" placeholder="0.00">
                         </div>
                         <div class="col-6 mb-3">
-                            <label class="form-label">Stock Qty</label>
-                            <input type="number" name="stock_quantity" class="form-control" required>
+                            <label class="form-label small fw-bold text-muted">Selling Price (K)</label>
+                            <input type="number" step="0.01" name="selling_price" class="form-control" required placeholder="0.00">
                         </div>
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">Initial Stock Quantity</label>
+                        <input type="number" step="0.01" name="stock_quantity" class="form-control" required placeholder="0">
+                    </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="submit" class="btn btn-success w-100">Save Product</button>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="submit" class="btn btn-success w-100 py-2 rounded-pill fw-bold shadow-sm">Save Product</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
+<!-- Scripts -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-
 <script>
 function printLabel(name, barcode, price) {
-    // Create a hidden SVG element to generate the barcode
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     JsBarcode(svg, barcode, {
         format: "CODE128",
@@ -187,25 +217,23 @@ function printLabel(name, barcode, price) {
         displayValue: true
     });
 
-    // Open a small print window
     const printWindow = window.open('', '_blank', 'width=300,height=400');
-    
     printWindow.document.write(`
         <html>
             <head>
                 <title>Print Label - ${name}</title>
                 <style>
                     body { font-family: sans-serif; text-align: center; padding: 20px; }
-                    .label-container { border: 1px dashed #ccc; padding: 10px; display: inline-block; }
-                    h2 { margin: 0; font-size: 18px; }
-                    .price { font-size: 22px; font-weight: bold; margin: 10px 0; }
+                    .label-container { border: 1px dashed #ccc; padding: 10px; display: inline-block; border-radius: 8px; }
+                    h2 { margin: 0; font-size: 16px; }
+                    .price { font-size: 20px; font-weight: bold; margin: 8px 0; color: #333; }
                     svg { max-width: 100%; }
                     @media print { @page { margin: 0; } body { margin: 0.5cm; } }
                 </style>
             </head>
             <body>
                 <div class="label-container">
-                    <div style="font-size: 10px; color: #666;">TOMSUZ POS</div>
+                    <div style="font-size: 9px; color: #666; font-weight: bold; letter-spacing: 1px;">TOMSUZ POS</div>
                     <h2>${name}</h2>
                     <div class="price">K${price}</div>
                     ${svg.outerHTML}
@@ -221,3 +249,4 @@ function printLabel(name, barcode, price) {
 </script>
 </body>
 </html>
+

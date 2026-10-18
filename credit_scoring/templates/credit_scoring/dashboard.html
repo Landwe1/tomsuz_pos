@@ -1,0 +1,113 @@
+{% extends 'base.html' %} {# Extends your project base template #}
+
+{% block title %}Bank Readiness & Credit Score - {{ store.name }}{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h2 class="fw-bold mb-0">Bank Readiness & Credit Score</h2>
+      <p class="text-muted mb-0">Store: <strong>{{ store.name }}</strong></p>
+    </div>
+    <a href="{% url 'credit_scoring:dashboard' %}" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-arrow-clockwise"></i> Refresh Score
+    </a>
+  </div>
+
+  <div class="row g-4">
+    <!-- Credit Score Gauge Card -->
+    <div class="col-md-5 col-lg-4">
+      <div class="card shadow-sm border-0 text-center p-4 h-100">
+        <h5 class="text-muted fw-normal">Credit Rating</h5>
+        
+        <div class="my-3">
+          <span class="display-2 fw-bold 
+            {% if profile.credit_score >= 700 %}text-success
+            {% elif profile.credit_score >= 550 %}text-warning
+            {% else %}text-danger{% endif %}">
+            {{ profile.credit_score }}
+          </span>
+          <span class="text-muted fs-5">/ 850</span>
+        </div>
+
+        <div>
+          {% if profile.risk_tier == 'LOW' %}
+            <span class="badge bg-success fs-6 px-3 py-2">Low Risk / Preferred Partner</span>
+          {% elif profile.risk_tier == 'MEDIUM' %}
+            <span class="badge bg-warning text-dark fs-6 px-3 py-2">Moderate Risk</span>
+          {% else %}
+            <span class="badge bg-danger fs-6 px-3 py-2">High Risk / Building Credit</span>
+          {% endif %}
+        </div>
+
+        <hr class="my-4">
+        
+        <div class="text-start fs-7 text-muted">
+          <p class="mb-1"><strong>Last Updated:</strong> {{ profile.last_updated|date:"d M Y, H:i" }}</p>
+          <p class="mb-0"><strong>Calculation Window:</strong> Past 90 Days</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loan Capacity & Metrics Summary -->
+    <div class="col-md-7 col-lg-8">
+      <!-- Max Recommended Loan Banner -->
+      <div class="card shadow-sm border-0 bg-primary text-white p-4 mb-4">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <h6 class="text-white-50 text-uppercase tracking-wider mb-1">Max Recommended Bank Loan Limit</h6>
+            <h1 class="display-5 fw-bold mb-0">K{{ profile.max_recommended_loan|floatformat:2 }}</h1>
+          </div>
+          <div class="d-none d-sm-block">
+            <i class="bi bi-bank fs-1 text-white-50"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- Financial Health Metrics Grid -->
+      <div class="row g-3">
+        <div class="col-sm-6 col-lg-4">
+          <div class="card shadow-sm border-0 p-3">
+            <span class="text-muted small">Avg. Monthly Revenue</span>
+            <h4 class="fw-bold text-dark mt-1 mb-0">K{{ profile.avg_monthly_revenue|floatformat:2 }}</h4>
+          </div>
+        </div>
+
+        <div class="col-sm-6 col-lg-4">
+          <div class="card shadow-sm border-0 p-3">
+            <span class="text-muted small">Gross Profit Margin</span>
+            <h4 class="fw-bold text-dark mt-1 mb-0">{{ profile.avg_gross_margin|floatformat:2 }}%</h4>
+          </div>
+        </div>
+
+        <div class="col-sm-6 col-lg-4">
+          <div class="card shadow-sm border-0 p-3">
+            <span class="text-muted small">Active Operating Days</span>
+            <h4 class="fw-bold text-dark mt-1 mb-0">{{ profile.active_days_last_90_days }} / 90 Days</h4>
+          </div>
+        </div>
+      </div>
+
+      <!-- Improvement Suggestions -->
+      <div class="card shadow-sm border-0 p-4 mt-4">
+        <h5 class="fw-bold mb-3">How to Boost Your Store's Loan Capacity</h5>
+        <ul class="list-group list-group-flush small">
+          <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-check-circle-fill text-success me-2"></i> Log sales consistently every operating day</span>
+            <span class="badge bg-light text-dark">+200 pts max</span>
+          </li>
+          <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-check-circle-fill text-success me-2"></i> Maintain accurate product buying prices for margin verification</span>
+            <span class="badge bg-light text-dark">+150 pts max</span>
+          </li>
+          <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-check-circle-fill text-success me-2"></i> Route MoMo and Cash payments directly through the POS</span>
+            <span class="badge bg-light text-dark">+200 pts max</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

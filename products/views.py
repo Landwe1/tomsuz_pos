@@ -1,15 +1,27 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.db.models import Q, F, Sum
+from django.db.models import Q, F
 from .models import Product
 
+
+def get_user_store(user):
+    """Helper to safely retrieve the store associated with the logged-in user."""
+    if hasattr(user, 'profile') and user.profile.store:
+        return user.profile.store
+    elif hasattr(user, 'store'):
+        return user.store
+    return None
+
+
 def product_list(request):
+    user_store = get_user_store(request.user)
+
     # 1. Handle "Quick Add" form submission
     if request.method == "POST":
         name = request.POST.get('name')
         barcode = request.POST.get('barcode')
         price = request.POST.get('selling_price')
         stock = request.POST.get('stock_quantity')
-        buying_price = request.POST.get('buying_price') # Added to capture your cost
+        buying_price = request.POST.get('buying_price')
 
         Product.objects.create(
             name=name,
@@ -17,17 +29,20 @@ def product_list(request):
             selling_price=price,
             buying_price=buying_price,
             stock_quantity=stock,
-            # Ensure it links to the user's store if applicable
-            store=request.user.store if hasattr(request.user, 'store') else None 
+            store=user_store,  # Securely tie to the logged-in user's store
+            is_active=True
         )
         return redirect('product_list')
 
-    # 2. Handle Search, Filters, and List display
+    # 2. Handle Search, Filters, and List display (Restricted to user's store & active products)
+    products = Product.objects.filter(is_active=True)
+    if user_store:
+        products = products.filter(store=user_store)
+    
+    products = products.order_by('-id')
+
     query = request.GET.get('q')
     show_low_stock = request.GET.get('low_stock')
-    
-    # Filter by store if your system is multi-tenant
-    products = Product.objects.all().order_by('-id')
 
     if query:
         products = products.filter(
@@ -35,14 +50,10 @@ def product_list(request):
         )
     
     if show_low_stock:
-        # Uses the logic: stock <= low_stock_threshold (usually 5)
         products = products.filter(stock_quantity__lte=F('low_stock_threshold'))
 
-    # --- NEW: Calculation for Total Inventory Value ---
-    # We sum up (stock_quantity * selling_price) for all filtered products
+    # Calculations for inventory metrics
     total_inventory_value = sum(product.stock_value for product in products)
-    
-    # Optional: Calculate total potential profit sitting in stock
     total_potential_profit = sum(product.potential_profit for product in products)
         
     return render(request, 'products/product_list.html', {
@@ -53,19 +64,41 @@ def product_list(request):
         'total_potential_profit': total_potential_profit,
     })
 
+
 def update_product(request, pk):
-    product = get_object_or_404(Product, pk=pk)
+    user_store = get_user_store(request.user)
+    
+    # Ensure the product belongs to the user's store
+    if user_store:
+        product = get_object_or_404(Product, pk=pk, store=user_store, is_active=True)
+    else:
+        product = get_object_or_404(Product, pk=pk, is_active=True)
+
     if request.method == "POST":
         product.name = request.POST.get('name')
         product.barcode = request.POST.get('barcode')
         product.selling_price = request.POST.get('selling_price')
-        product.buying_price = request.POST.get('buying_price') # Added
+        product.buying_price = request.POST.get('buying_price')
         product.stock_quantity = request.POST.get('stock_quantity')
         product.save()
+        
     return redirect('product_list')
 
+
 def delete_product(request, pk):
-    product = get_object_or_404(Product, pk=pk)
+    user_store = get_user_store(request.user)
+    
+    # Ensure the product belongs to the user's store
+    if user_store:
+        product = get_object_or_404(Product, pk=pk, store=user_store, is_active=True)
+    else:
+        product = get_object_or_404(Product, pk=pk, is_active=True)
+
     if request.method == "POST":
-        product.delete()
+        # --- SAFE SOFT DELETE ---
+        # Hides product from inventory and POS, but preserves old receipts and profit logs
+        product.is_active = False
+        product.save(update_fields=['is_active'])
+        
     return redirect('product_list')
+

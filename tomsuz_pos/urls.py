@@ -16,7 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from . import views # You'll need to create a view for the landing page
+from . import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -24,6 +24,9 @@ urlpatterns = [
     path('sales/', include('sales.urls')),
     path('accounts/', include('accounts.urls')),
     
-    # This is the "Front Door" where users see your TomSuz branding
+    # Credit Scoring API / Dashboard routes
+    path('credit-scoring/', include('credit_scoring.urls')),
+    
+    # "Front Door" landing page
     path('', views.landing_page, name='landing'), 
 ]
